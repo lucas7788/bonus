@@ -21,7 +21,6 @@ func setupAPP() *cli.App {
 	app.Version = config.Version
 	app.Copyright = "Copyright in 2018 The Ontology Authors"
 	app.Flags = []cli.Flag{
-		//common setting
 		cmd.LogLevelFlag,
 		cmd.RestPortFlag,
 	}

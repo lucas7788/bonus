@@ -115,6 +115,7 @@ func (self *EthManager) VerifyAddress(address string) error {
 	}
 	return nil
 }
+
 func (self *EthManager) GetAdminAddress() string {
 	return self.account.Address.Hex()
 }

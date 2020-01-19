@@ -1,0 +1,205 @@
+package transfer
+
+import (
+	"github.com/CandyDrop/core/project"
+	"github.com/ontio/bonus/common"
+	"github.com/ontio/bonus/config"
+	"github.com/ontio/bonus/db"
+	"github.com/ontio/bonus/manager/interfaces"
+	common2 "github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/common/log"
+	"strconv"
+	"sync"
+	"time"
+)
+
+type TxHandleTask struct {
+	TransferQueue      chan *common.TransferParam
+	verifyTxQueue      chan string
+	hasTransferedOntid map[string]bool
+	closeChan          chan bool
+	rwLock             *sync.RWMutex
+}
+
+func NewTxHandleTask() *TxHandleTask {
+	transferQueue := make(chan *common.TransferParam, config.TRANSFER_QUEUE_SIZE)
+	verifyQueue := make(chan string, config.VERIFY_TX_QUEUE_SIZE)
+	return &TxHandleTask{
+		TransferQueue: transferQueue,
+		verifyTxQueue: verifyQueue,
+	}
+}
+
+func (self *TxHandleTask) WaitClose() {
+	<-self.closeChan
+}
+
+func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, excelFileName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("recover info: ", r)
+		}
+	}()
+	for {
+		select {
+		case param, ok := <-self.TransferQueue:
+			if !ok || param == nil {
+				close(self.verifyTxQueue)
+				log.Infof("close(self.verifyTxQueue)")
+				return
+			}
+			var txHex []byte
+			var err error
+			txInfo, err := db.QueryTxHexByExcelAndAddr(excelFileName, param.Address)
+			if err != nil {
+				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
+				continue
+			}
+			if txInfo != nil && txInfo.TxResult == common.TxSuccess {
+				continue
+			}
+			//if tx verify failed, here should be verify again
+			if (txInfo != nil && txInfo.TxResult == common.TxFailed && txInfo.TxHash != "") ||
+				(txInfo != nil && txInfo.TxResult == common.SendSuccess && txInfo.TxHash != "") ||
+				(txInfo != nil && txInfo.TxResult == common.SendFailed && txInfo.TxHash != "") {
+				boo := mana.VerifyTx(txInfo.TxHash)
+				if boo {
+					log.Infof("Failed transactions revalidate success, txhash: %s", txInfo.TxHash)
+					ti, err := mana.GetTxTime(txInfo.TxHash)
+					if err != nil {
+						log.Errorf("GetTxTime error: %s", err)
+						continue
+					}
+					err = project.UpdateTxResult(txInfo.TxHash, project.TxSuccess, ti)
+					if err != nil {
+						log.Errorf("UpdateTxResult failed, txhash: %s, error: %s", txInfo.TxHash, err)
+					}
+					continue
+				}
+				log.Infof("Failed transactions revalidate failed, txhash: %s", txInfo.TxHash)
+			}
+			if txInfo != nil && txInfo.TxHex != "" {
+				txHex, err = common2.HexToBytes(txInfo.TxHex)
+				if err != nil {
+					log.Errorf("QueryTxHexByOntid HexToBytes failed, error: %s", err)
+					continue
+				}
+			}
+			if txInfo == nil {
+				txInfo = &common.TransactionInfo{}
+			}
+			//build tx
+			var amountStr string
+			if txHex == nil {
+				amountStr = strconv.FormatFloat(param.Amount, 'f', -1, 64)
+				var txHash string
+				txHash, txHex, err = mana.NewWithdrawTx(param.Address, amountStr)
+				if err != nil || txHash == "" || txHex == nil {
+					log.Errorf("Build Transfer Tx failed,address: %s,txHash: %s, err: %s", param.Address, txHash, err)
+					if txInfo == nil {
+						err := db.UpdateTxResult(excelFileName, param.Address, common.BuildTxFailed)
+						if err != nil {
+							log.Errorf("InsertTransactionInfo error: %s, excelFileName: %s, address: %s", err, excelFileName, param.Address)
+						}
+					}
+					continue
+				}
+				//Avoid repetitive insert
+				if txInfo == nil {
+					err := db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.NotSend, excelFileName, param.Address)
+					if err != nil {
+						log.Errorf("InsertTransactionInfo error: %s, excelFileName: %s, address: %s", err, excelFileName, param.Address)
+						continue
+					}
+				} else {
+					err = db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.NotSend, excelFileName, param.Address)
+					if err != nil {
+						log.Errorf("UpdateTxInfo failed, excelFileName: %s,txhash: %s, txHex: %s error: %s",
+							excelFileName, txHash, common2.ToHexString(txHex), err)
+						continue
+					}
+				}
+
+				log.Debugf("tx build success, txhash: %s", txHash)
+				//update receive txhash
+				txInfo.TxHash = txHash
+				log.Debugf("InsertTransactionInfo success, excelFileName: %s, address: %s, txHash: %s",
+					excelFileName, param.Address, txHash)
+			}
+
+			log.Debugf("tx build success, txHash: %s, txHex: %s", txInfo.TxHash, common2.ToHexString(txHex))
+
+			//send tx
+			retry := 0
+			var hash string
+			for {
+				hash, err = mana.SendTx(txHex)
+				if err != nil && retry < config.RetryLimit {
+					retry += 1
+					time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
+					continue
+				} else {
+					break
+				}
+			}
+			if err != nil || hash == "" {
+				log.Errorf("SendTx error: %s, txhash: %s", err, txInfo.TxHash)
+				//save txHex
+				err = project.UpdateTxResult(txInfo.TxHash, project.SendFailed, 0)
+				if err != nil {
+					log.Errorf("UpdateTxResult error: %s, excelFileName: %s, address: %s, txHash: %s, txresult: %d",
+						err, excelFileName, param.Address, txInfo.TxHash, byte(project.SendFailed))
+				}
+				continue
+			} else {
+				//save txHex
+				err = project.UpdateTxResult(txInfo.TxHash, project.SendSuccess, 0)
+				if err != nil {
+					log.Errorf("UpdateTxResult error: %s, excelFileName: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
+						err, excelFileName, param.Address, txInfo.TxHash, byte(project.SendSuccess))
+				}
+			}
+			log.Debugf("tx send success, txhash: %s", txInfo.TxHash)
+			self.verifyTxQueue <- hash
+		}
+	}
+}
+
+func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("recover info: ", r)
+		}
+	}()
+	for {
+		select {
+		case hash, ok := <-self.verifyTxQueue:
+			if !ok || hash == "" {
+				close(self.closeChan)
+				log.Info("close(self.closeChan), verify over")
+				return
+			}
+			boo := mana.VerifyTx(hash)
+			if !boo {
+				//save failed tx to db
+				err := project.UpdateTxResult(hash, project.TxFailed, 0)
+				if err != nil {
+					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, hash)
+				}
+				log.Errorf("VerifyTx failed, txhash: %s", hash)
+				continue
+			}
+			ti, err := mana.GetTxTime(hash)
+			if err != nil {
+				log.Errorf("GetTxTime error: %s", err)
+				continue
+			}
+			//update db
+			err = project.UpdateTxResult(hash, project.TxSuccess, ti)
+			if err != nil {
+				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, hash)
+			}
+			log.Debugf("verify tx success, txhash: %s", hash)
+		}
+	}
+}

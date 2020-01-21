@@ -24,6 +24,8 @@ var ErrMap = map[int64]string{
 	SumError:               "SumError",
 	InsertEventTypeError:   "InsertEventTypeError",
 	GetAdminBalanceError:   "GetAdminBalanceError",
+	ExcelDuplicateAddress:  "ExcelDuplicateAddress",
+	AmountIsNegative:       "AmountIsNegative",
 }
 
 const (
@@ -40,4 +42,6 @@ const (
 	SumError               = 40009
 	InsertEventTypeError   = 40010
 	GetAdminBalanceError   = 40011
+	ExcelDuplicateAddress  = 40012
+	AmountIsNegative       = 40013
 )

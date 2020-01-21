@@ -232,18 +232,20 @@ func (self *OntManager) GetAdminBalance() (string, error) {
 		}
 		ba = strconv.FormatUint(val, 10)
 	} else if self.eatp.TokenType == config.ONG {
-		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		val, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
 		if err != nil {
 			return "", err
 		}
-		ba = strconv.FormatUint(val, 10)
+		r := new(big.Int)
+		r.SetUint64(val)
+		ba = utils.ToStringByPrecise(r, 9)
 	} else if self.eatp.TokenType == config.OEP4 {
 		oep4 := oep4.NewOep4(self.oep4ContractAddress, self.ontSdk)
 		val, err := oep4.BalanceOf(self.account.Address)
 		if err != nil {
 			return "", err
 		}
-		ba = val.String()
+		ba = utils.ToStringByPrecise(val, uint64(self.precision))
 	} else {
 		return "", fmt.Errorf("token type should be ONT or ONG")
 	}

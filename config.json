@@ -1,4 +1,22 @@
 {
   "rest_port":8080,
-  "version":"1.0.0"
+  "version":"1.0.0",
+  "bonusdb_url":"127.0.0.1:3306",
+  "bonusdb_name":"bonus",
+  "bonusdb_user":"root",
+  "bonusdb_password":"111111",
+  "ont_cfg": {
+    "ont_json_rpc_address":"http://polaris1.ont.io:20336",
+    "gas_price":500,
+    "gas_limit":2000000
+  },
+  "eth_cfg":{
+    "rpc_addr": "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+    "tokens": [
+      {
+        "token_name": "ZIL",
+        "contract_addr": "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"
+      }
+    ]
+  }
 }

@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CandyDrop/cmd/utils"
 	"github.com/ontio/bonus/config"
 	"github.com/urfave/cli"
 	"io/ioutil"
@@ -27,9 +26,13 @@ func SetOntologyConfig(ctx *cli.Context) error {
 		return err
 	}
 	config.DefConfig = cfg
-	port := ctx.Uint(utils.GetFlagName(utils.RestPortFlag))
+	port := ctx.Uint(GetFlagName(RestPortFlag))
 	if port != 0 {
 		config.DefConfig.RestPort = port
+	}
+	if config.DefConfig.OntCfg.OntJsonRpcAddress == "" ||
+		config.DefConfig.EthCfg.RpcAddr == "" {
+		return fmt.Errorf("OntJsonRpcAddress and RpcAddr is nil")
 	}
 	return nil
 }

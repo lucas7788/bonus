@@ -1,12 +1,20 @@
 package common
 
 import (
-	"strings"
 	"fmt"
-	"os"
 	"github.com/ontio/ontology/common/log"
+	"os"
+	"strings"
 )
 
+func IsHave(allStr []string, item string) bool {
+	for _, ind := range allStr {
+		if ind == item {
+			return true
+		}
+	}
+	return false
+}
 
 func PathExists(path string) bool {
 	_, err := os.Stat(path)

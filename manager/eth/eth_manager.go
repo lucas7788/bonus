@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"bytes"
-	"github.com/CandyDrop/utils"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -24,14 +23,15 @@ import (
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/transfer"
+	"github.com/ontio/bonus/utils"
 	"github.com/ontio/ontology/common/log"
 	"os"
-	common3 "github.com/CandyDrop/common"
+	"strconv"
 )
 
 var (
 	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000001", config.ETH_DECIMALS) // 10 Gwei
-	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.01", config.ETH_DECIMALS)
+	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.0001", config.ETH_DECIMALS)
 )
 
 type Token struct {
@@ -51,10 +51,10 @@ type EthManager struct {
 	txHandleTask *transfer.TxHandleTask
 	cfg          *config.Eth
 	lock         sync.RWMutex
-	eatp         *common2.ExcelAndTransferParam
+	eatp         *common2.ExcelParam
 }
 
-func NewEthManager(cfg *config.Eth, eatp *common2.ExcelAndTransferParam) (*EthManager, error) {
+func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam) (*EthManager, error) {
 	if cfg.RpcAddr == "" {
 		return nil, fmt.Errorf("RpcAddr config error")
 	}
@@ -67,11 +67,14 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelAndTransferParam) (*EthMa
 	if err != nil {
 		return nil, err
 	}
-	err = common3.CheckPath(cfg.KeyStore)
+	err = common2.CheckPath(cfg.KeyStore)
 	if err != nil {
 		return nil, err
 	}
-	walletPath := fmt.Sprintf("%s%s%s%s", cfg.KeyStore, string(os.PathSeparator), "eth_", eatp.FileName)
+	if cfg.KeyStore == "" {
+		cfg.KeyStore = fmt.Sprintf("%s%s%s", config.DefaultWalletPath, string(os.PathSeparator), "eth")
+	}
+	walletPath := fmt.Sprintf("%s%s%s%s", cfg.KeyStore, string(os.PathSeparator), "eth_", eatp.EventType)
 	log.Infof("eth wallet path: %s", walletPath)
 
 	keyStore := keystore.NewKeyStore(walletPath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -108,6 +111,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelAndTransferParam) (*EthMa
 	}
 	return mgr, nil
 }
+
 func (self *EthManager) VerifyAddress(address string) error {
 	boo := ethComm.IsHexAddress(address)
 	if !boo {
@@ -118,6 +122,50 @@ func (self *EthManager) VerifyAddress(address string) error {
 
 func (self *EthManager) GetAdminAddress() string {
 	return self.account.Address.Hex()
+}
+
+func (self *EthManager) GetAdminBalance() (string, error) {
+	if self.eatp.TokenType == config.ERC20 {
+		erc20, ok := self.tokens[self.eatp.ContractAddress]
+		if !ok {
+			return "", fmt.Errorf("Withdraw: token %s not exist", self.eatp.ContractAddress)
+		}
+		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
+		if err != nil {
+			return "", fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.eatp.ContractAddress, err)
+		}
+		return utils.ToStringByPrecise(balance, erc20.Decimals), nil
+	}
+	return "", fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+}
+
+func (self *EthManager) EstimateFee() (string, error) {
+	oneFee := float64(0.0000352)
+	res := float64(len(self.eatp.BillList)) * oneFee
+	return strconv.FormatFloat(res, 'f', 9, 64), nil
+}
+
+func (self *EthManager) ComputeSum() (string, error) {
+	if self.eatp.TokenType == config.ERC20 {
+		sum := new(big.Int)
+		for _, item := range self.eatp.BillList {
+			val := utils.ToIntByPrecise(item.Amount, self.tokens[self.eatp.ContractAddress].Decimals)
+			sum = sum.Add(sum, val)
+		}
+		return utils.ToStringByPrecise(sum, self.tokens[self.eatp.ContractAddress].Decimals), nil
+	}
+	return "", fmt.Errorf("not supported token type: %s", self.eatp.TokenType)
+}
+
+func (self *EthManager) WithdrawToken(address string) error {
+	if self.eatp.TokenType == config.ERC20 {
+		ba, err := self.GetAdminBalance()
+		if err != nil {
+			return err
+		}
+		self.NewWithdrawTx(address, ba)
+	}
+	return nil
 }
 
 func (this *EthManager) SetContractAddress(address string) error {
@@ -148,7 +196,7 @@ func (self *EthManager) StartTransfer() {
 func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
 	self.txHandleTask = transfer.NewTxHandleTask()
-	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.FileName)
+	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 

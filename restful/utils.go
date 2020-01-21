@@ -8,8 +8,47 @@ import (
 	"github.com/qiangxue/fasthttp-routing"
 )
 
+func ParseQueryDataParam(ctx *routing.Context) ([]string, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return nil, errCode
+	}
+	arg, ok := param["eventType"]
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	pa, ok := arg.([]interface{})
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	res := make([]string, 0)
+	for _, item := range pa {
+		it, ok := item.(string)
+		if !ok {
+			return nil, TypeTransferError
+		}
+		res = append(res, it)
+	}
+	return res, SUCCESS
+}
 
-func ParseExcelAndTransferParam(ctx *routing.Context) (*common.ExcelAndTransferParam, int64) {
+func ParseTransferParam(ctx *routing.Context) (string, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return "", errCode
+	}
+	args, ok := param["eventType"]
+	if !ok {
+		return "", PARA_ERROR
+	}
+	pa, ok := args.(string)
+	if !ok {
+		return "", PARA_ERROR
+	}
+	return pa, SUCCESS
+}
+
+func parse(ctx *routing.Context) (map[string]interface{}, int64) {
 	req := ctx.PostBody()
 	if req == nil || len(req) == 0 {
 		log.Errorf("param length is 0\n")
@@ -27,49 +66,42 @@ func ParseExcelAndTransferParam(ctx *routing.Context) (*common.ExcelAndTransferP
 		log.Errorf("param.(map[string]interface{})\n")
 		return nil, PARA_ERROR
 	}
-	tokenType, ok := para["tokenType"].(string)
+	return para, SUCCESS
+}
+
+func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return nil, errCode
+	}
+
+	tokenType, ok := param["tokenType"].(string)
 	if !ok || tokenType == "" {
 		log.Errorf("tokenType error\n")
 		return nil, PARA_ERROR
 	}
-	contractAddress, ok := para["contractAddress"].(string)
+	contractAddress, ok := param["contractAddress"].(string)
 	if !ok {
 		log.Errorf("contractAddress error\n")
 		return nil, PARA_ERROR
 	}
-	privateKey, ok := para["privateKey"].(string)
-	if !ok {
-		log.Errorf("privateKey error\n")
+	if tokenType == config.ERC20 && contractAddress == "" {
+		log.Errorf("tokenType == config.ERC20 and contractAddress is nil\n")
 		return nil, PARA_ERROR
 	}
-	if tokenType == config.ERC20 && (privateKey == "" || contractAddress == "") {
-		log.Errorf("privateKey error\n")
-		return nil, PARA_ERROR
-	}
-	walletFile, ok := para["walletFile"].(string)
-	if !ok {
-		log.Errorf("walletFile error\n")
-		return nil, PARA_ERROR
-	}
-	pwd, ok := para["pwd"].(string)
-	if !ok {
-		log.Errorf("pwd error\n")
-		return nil, PARA_ERROR
-	}
-	if tokenType == config.OEP4 && (walletFile == "" || pwd == "" || contractAddress == "") {
+	if tokenType == config.OEP4 && contractAddress == "" {
 		log.Errorf("param error\n")
 		return nil, PARA_ERROR
 	}
-
-	fileName, ok := para["fileName"].(string)
-	if !ok || fileName == "" {
-		log.Errorf("fileName error\n")
+	eventType, ok := param["eventType"].(string)
+	if !ok || eventType == "" {
+		log.Errorf("transfer is nil\n")
 		return nil, PARA_ERROR
 	}
 	transferParam := make([]*common.TransferParam, 0)
-	billListRaw, ok := para["billList"]
+	billListRaw, ok := param["billList"]
 	if !ok {
-		log.Errorf("param Unmarshal error: %s \n", err)
+		log.Errorf("param Unmarshal error\n")
 		return nil, PARA_ERROR
 	}
 	billList, ok := billListRaw.([]interface{})
@@ -89,7 +121,7 @@ func ParseExcelAndTransferParam(ctx *routing.Context) (*common.ExcelAndTransferP
 			log.Info("address", pi["address"])
 			return nil, PARA_ERROR
 		}
-		amt, ok := pi["amount"].(float64)
+		amt, ok := pi["amount"].(string)
 		if !ok {
 			log.Errorf("amount parse error,")
 			log.Info("address", pi["amount"])
@@ -97,17 +129,31 @@ func ParseExcelAndTransferParam(ctx *routing.Context) (*common.ExcelAndTransferP
 		}
 		tp := &common.TransferParam{
 			Address: addr,
-			Amount:  float64(amt),
+			Amount:  amt,
 		}
 		transferParam = append(transferParam, tp)
 	}
-	return &common.ExcelAndTransferParam{
+	return &common.ExcelParam{
 		BillList:        transferParam,
 		TokenType:       tokenType,
-		PrivateKey:      privateKey,
 		ContractAddress: contractAddress,
-		FileName:        fileName,
-		WalletFileContent:      walletFile,
-		Pwd:             pwd,
+		EventType:       eventType,
 	}, SUCCESS
+}
+
+func ParseTxInfoToEatp(txInfo []*common.TransactionInfo) *common.ExcelParam {
+	billList := make([]*common.TransferParam, 0)
+	for _, item := range txInfo {
+		billList = append(billList, &common.TransferParam{
+			Address: item.Address,
+			Amount:  item.Amount,
+		})
+	}
+	res := &common.ExcelParam{
+		BillList:        billList,
+		TokenType:       txInfo[0].TokenType,
+		EventType:       txInfo[0].EventType,
+		ContractAddress: txInfo[0].ContractAddress,
+	}
+	return res
 }

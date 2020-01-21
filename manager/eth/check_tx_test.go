@@ -2,10 +2,10 @@ package eth
 
 import (
 	"encoding/json"
-	"github.com/CandyDrop/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ontio/bonus/utils"
 	"github.com/ontio/ontology/common/log"
 	"io/ioutil"
 	"math/big"

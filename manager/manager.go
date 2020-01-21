@@ -2,15 +2,15 @@ package manager
 
 import (
 	"fmt"
+	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/bonus/manager/ont"
 	"github.com/ontio/ontology/common/log"
-	"github.com/ontio/bonus/common"
 )
 
-func InitManager(eatp *common.ExcelAndTransferParam) (interfaces.WithdrawManager, error) {
+func InitManager(eatp *common.ExcelParam) (interfaces.WithdrawManager, error) {
 	manager, err := createManager(eatp)
 	if err != nil {
 		return nil, err
@@ -30,18 +30,17 @@ func InitManager(eatp *common.ExcelAndTransferParam) (interfaces.WithdrawManager
 	return manager, nil
 }
 
-func createManager(eatp *common.ExcelAndTransferParam) (interfaces.WithdrawManager, error) {
+func createManager(eatp *common.ExcelParam) (interfaces.WithdrawManager, error) {
 
 	switch eatp.TokenType {
 	case config.ONG, config.OEP4, config.ONT:
 		//init ont manager
-		ontManager, err := ont.NewOntManager(config.DefConfig.Ont, eatp)
+		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp)
 		if err != nil {
 			return nil, err
 		}
 		return ontManager, nil
 	case config.ERC20:
-
 		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp)
 		if err != nil {
 			return nil, err

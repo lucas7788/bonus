@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/cmd"
 	"github.com/ontio/bonus/config"
-	"github.com/ontio/bonus/db"
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 )
 
@@ -46,20 +47,21 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("initConfig error: %s", err)
 		return
 	}
-	//err = initDB(ctx)
-	//if err != nil {
-	//	log.Errorf("initDB error: %s", err)
-	//	return
-	//}
+	err = initDB(ctx)
+	if err != nil {
+		log.Errorf("initDB error: %s", err)
+		return
+	}
+	restful.DefBonusMap = new(sync.Map)
 	restful.StartServer()
 	waitToExit()
 }
 
 func initDB(ctx *cli.Context) error {
-	dberr := db.ConnectDB()
+	dberr := bonus_db.ConnectDB()
 	if dberr != nil {
-		log.Errorf("username: %s, password: %s", config.DefConfig.ProjectDBUser,
-			config.DefConfig.ProjectDBPassword)
+		log.Errorf("username: %s, password: %s", config.DefConfig.BonusDBUser,
+			config.DefConfig.BonusDBPassword)
 		return fmt.Errorf("ConnectDB error: %s", dberr)
 	}
 	return nil

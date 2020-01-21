@@ -8,5 +8,9 @@ type WithdrawManager interface {
 	StartTransfer()
 	StartHandleTxTask()
 	GetAdminAddress() string
+	EstimateFee() (string, error)
 	GetTxTime(txHash string) (uint32, error)
+	GetAdminBalance() (string, error)
+	WithdrawToken(address string) error
+	ComputeSum() (string, error)
 }

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology/common/log"
 )
 
@@ -17,14 +16,14 @@ type Config struct {
 	HttpMaxConnections int    `json:"http_max_connections"`
 	HttpCertPath       string `json:"http_cert_path"`
 	HttpKeyPath        string `json:"http_key_path"`
-	ProjectDBHost      string `json:"projectdb_host"`
-	ProjectDBPort      string `json:"projectdb_port"`
-	ProjectDBUrl       string `json:"projectdb_url"`
-	ProjectDBUser      string `json:"projectdb_user"`
-	ProjectDBPassword  string `json:"projectdb_password"`
-	ProjectDBName      string `json:"projectdb_name"`
-	Ont                *Ont   `json:"ont"`
-	EthCfg             *Eth   `json:"eth"`
+	BonusDBHost        string `json:"bonusdb_host"`
+	BonusDBPort        string `json:"bonusdb_port"`
+	BonusDBUrl         string `json:"bonusdb_url"`
+	BonusDBUser        string `json:"bonusdb_user"`
+	BonusDBPassword    string `json:"bonusdb_password"`
+	BonusDBName        string `json:"bonusdb_name"`
+	OntCfg             *Ont   `json:"ont_cfg"`
+	EthCfg             *Eth   `json:"eth_cfg"`
 }
 
 const (
@@ -42,7 +41,6 @@ var (
 	AIRDROP_QUEUE_SIZE     = 10000
 	RECEIVE_INFO_CHAN_SIZE = 10000
 	All_TOKEN_TYPE         []string //need init when server start, //TODO
-	OperatorPubKey         keypair.PublicKey
 )
 
 type Ont struct {

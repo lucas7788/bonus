@@ -2,17 +2,33 @@ package common
 
 type TransferParam struct {
 	Address string
-	Amount  float64
+	Amount  string
 }
 
 type TransactionInfo struct {
-	TokenType string
-	Address   string
-	Amount    float64
-	TxHash    string
-	TxHex     string
-	TxResult  TxResult
+	EventType       string
+	TokenType       string
+	ContractAddress string
+	Address         string
+	Amount          string
+	TxHash          string
+	TxTime          uint32
+	TxHex           string
+	TxResult        TxResult
+	ErrorDetail     string
 }
+
+type GetDataByEventType struct {
+	TxInfo          []*TransactionInfo
+	Admin           string
+	EstimateFee     string
+	Sum             string
+	AdminBalance    string
+	EventType       string
+	TokenType       string
+	ContractAddress string
+}
+
 type TxResult byte
 
 const (
@@ -24,11 +40,13 @@ const (
 	TxSuccess
 )
 
-
-type ExcelAndTransferParam struct {
-	BillList          []*TransferParam
-	TokenType         string
-	PrivateKey        string
-	ContractAddress   string
-	FileName          string
+type ExcelParam struct {
+	BillList        []*TransferParam
+	TokenType       string
+	ContractAddress string
+	EventType       string
+	Admin           string
+	EstimateFee     string
+	Sum             string
+	AdminBalance    string
 }

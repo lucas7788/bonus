@@ -2,18 +2,20 @@ package ont
 
 import (
 	"fmt"
-	"github.com/CandyDrop/utils"
+	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/transfer"
+	"github.com/ontio/bonus/utils"
 	sdk "github.com/ontio/ontology-go-sdk"
+	"github.com/ontio/ontology-go-sdk/oep4"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"math/big"
 	"os"
+	"strconv"
 	"time"
-	common2 "github.com/ontio/bonus/common"
 )
 
 var OntIDVersion = byte(0)
@@ -29,10 +31,10 @@ type OntManager struct {
 	ipIndex             int
 	precision           int
 	txHandleTask        *transfer.TxHandleTask
-	eatp                *common2.ExcelAndTransferParam
+	eatp                *common2.ExcelParam
 }
 
-func NewOntManager(cfg *config.Ont, eatp *common2.ExcelAndTransferParam) (*OntManager, error) {
+func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam) (*OntManager, error) {
 	ontSdk := sdk.NewOntologySdk()
 	ontSdk.NewRpcClient().SetAddress(cfg.OntJsonRpcAddress)
 
@@ -44,7 +46,7 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelAndTransferParam) (*OntMa
 		return nil, err
 	}
 
-	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.FileName)
+	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.EventType)
 	walletFile := fmt.Sprintf("%s%s%s", cfg.WalletFile, string(os.PathSeparator), walletName)
 	var wallet *sdk.Wallet
 	if !common2.PathExists(walletFile) {
@@ -52,7 +54,7 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelAndTransferParam) (*OntMa
 		if err != nil {
 			return nil, err
 		}
-	}  else {
+	} else {
 		wallet, err = ontSdk.OpenWallet(walletFile)
 		if err != nil {
 			log.Fatalf("Can't open local wallet: %s", err)
@@ -61,14 +63,24 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelAndTransferParam) (*OntMa
 	}
 
 	log.Infof("ont walletFile: %s", walletFile)
-	acc, err := wallet.GetDefaultAccount([]byte(config.PASSWORD))
-	if err != nil {
+	acct, err := wallet.GetDefaultAccount([]byte(config.PASSWORD))
+	if (err != nil && err.Error() == "does not set default account") || acct == nil {
+		acct, err = wallet.NewDefaultSettingAccount([]byte(config.PASSWORD))
+		if err != nil {
+			return nil, err
+		}
+		err = wallet.Save()
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		log.Errorf("GetDefaultAccount failed, error: %s", err)
 		return nil, err
 	}
-	log.Infof("ont admin address: %s", acc.Address.ToBase58())
+	log.Infof("ont admin address: %s", acct.Address.ToBase58())
 
-	ontManager := &OntManager {
-		account: acc,
+	ontManager := &OntManager{
+		account: acct,
 		ontSdk:  ontSdk,
 		cfg:     cfg,
 		eatp:    eatp,
@@ -95,7 +107,7 @@ func (self *OntManager) StartTransfer() {
 func (self *OntManager) StartHandleTxTask() {
 	txHandleTask := transfer.NewTxHandleTask()
 	self.txHandleTask = txHandleTask
-	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.FileName)
+	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 
@@ -209,6 +221,61 @@ func (self *OntManager) NewWithdrawTx(destAddr string, amount string) (string, [
 
 func (self *OntManager) GetAdminAddress() string {
 	return self.account.Address.ToBase58()
+}
+
+func (self *OntManager) GetAdminBalance() (string, error) {
+	var ba string
+	if self.eatp.TokenType == config.ONT {
+		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		if err != nil {
+			return "", err
+		}
+		ba = strconv.FormatUint(val, 10)
+	} else if self.eatp.TokenType == config.ONG {
+		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		if err != nil {
+			return "", err
+		}
+		ba = strconv.FormatUint(val, 10)
+	} else if self.eatp.TokenType == config.OEP4 {
+		oep4 := oep4.NewOep4(self.oep4ContractAddress, self.ontSdk)
+		val, err := oep4.BalanceOf(self.account.Address)
+		if err != nil {
+			return "", err
+		}
+		ba = val.String()
+	} else {
+		return "", fmt.Errorf("token type should be ONT or ONG")
+	}
+	return ba, nil
+}
+
+func (self *OntManager) EstimateFee() (string, error) {
+	fee := float64(len(self.eatp.BillList)) * 0.01
+	return strconv.FormatFloat(fee, 'f', -1, 64), nil
+}
+func (self *OntManager) ComputeSum() (string, error) {
+	sum := uint64(0)
+	if self.eatp.TokenType == config.ONT || self.eatp.TokenType == config.ONG {
+		for _, item := range self.eatp.BillList {
+			val, err := strconv.ParseUint(item.Amount, 10, 64)
+			if err != nil {
+				return "", err
+			}
+			sum += val
+		}
+		return strconv.FormatUint(sum, 10), nil
+	} else if self.eatp.TokenType == config.OEP4 {
+		for _, item := range self.eatp.BillList {
+			val := utils.ParseAssetAmount(item.Amount, self.precision)
+			sum += val
+		}
+		temp := new(big.Int)
+		temp.SetUint64(sum)
+		return utils.ToStringByPrecise(temp, uint64(self.precision)), nil
+	} else {
+		return "", fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+	}
 }
 
 func (self *OntManager) GetTxTime(txHash string) (uint32, error) {

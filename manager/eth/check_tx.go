@@ -3,11 +3,11 @@ package eth
 import (
 	"context"
 	"fmt"
-	"github.com/CandyDrop/utils"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ontio/bonus/utils"
 	"io/ioutil"
 	"strings"
 )

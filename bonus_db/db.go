@@ -113,18 +113,6 @@ func UpdateTxResult(eventType, address string, txResult common.TxResult, txTime 
 	_, err = stmt.Exec(txResult, txTime, errDetail, eventType, address)
 	return err
 }
-func UpdateTxResultByTxHash(txHash string, txResult common.TxResult, txTime uint32) error {
-	strSql := "update bonus_transaction_info set TxResult=?, TxTime=? where TxHash = ?"
-	stmt, err := DefDB.Prepare(strSql)
-	if stmt != nil {
-		defer stmt.Close()
-	}
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(txResult, txTime, txHash)
-	return err
-}
 
 func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInfo, error) {
 	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=?"

@@ -13,15 +13,21 @@ import (
 
 type TxHandleTask struct {
 	TransferQueue      chan *common.TransferParam
-	verifyTxQueue      chan string
+	verifyTxQueue      chan *VerifyParam
 	hasTransferedOntid map[string]bool
 	closeChan          chan bool
 	rwLock             *sync.RWMutex
 }
 
+type VerifyParam struct {
+	TxHash    string
+	EventType string
+	Address   string
+}
+
 func NewTxHandleTask() *TxHandleTask {
 	transferQueue := make(chan *common.TransferParam, config.TRANSFER_QUEUE_SIZE)
-	verifyQueue := make(chan string, config.VERIFY_TX_QUEUE_SIZE)
+	verifyQueue := make(chan *VerifyParam, config.VERIFY_TX_QUEUE_SIZE)
 	return &TxHandleTask{
 		TransferQueue: transferQueue,
 		verifyTxQueue: verifyQueue,
@@ -92,11 +98,9 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				txHash, txHex, err = mana.NewWithdrawTx(param.Address, param.Amount)
 				if err != nil || txHash == "" || txHex == nil {
 					log.Errorf("Build Transfer Tx failed,address: %s,txHash: %s, err: %s", param.Address, txHash, err)
-					if txInfo == nil {
-						err := bonus_db.UpdateTxResult(eventType, param.Address, common.BuildTxFailed, 0, err.Error())
-						if err != nil {
-							log.Errorf("InsertTransactionInfo error: %s, eventType: %s, address: %s", err, eventType, param.Address)
-						}
+					err := bonus_db.UpdateTxResult(eventType, param.Address, common.BuildTxFailed, 0, err.Error())
+					if err != nil {
+						log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s", err, eventType, param.Address)
 					}
 					continue
 				}
@@ -104,7 +108,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				if txInfo == nil {
 					err := bonus_db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.NotSend, eventType, param.Address)
 					if err != nil {
-						log.Errorf("InsertTransactionInfo error: %s, eventType: %s, address: %s", err, eventType, param.Address)
+						log.Errorf("UpdateTxInfo error: %s, eventType: %s, address: %s", err, eventType, param.Address)
 						continue
 					}
 				} else {
@@ -156,7 +160,11 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				}
 			}
 			log.Debugf("tx send success, txhash: %s", txInfo.TxHash)
-			self.verifyTxQueue <- hash
+			self.verifyTxQueue <- &VerifyParam{
+				TxHash:    hash,
+				Address:   param.Address,
+				EventType: eventType,
+			}
 		}
 	}
 }
@@ -169,33 +177,33 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 	}()
 	for {
 		select {
-		case hash, ok := <-self.verifyTxQueue:
-			if !ok || hash == "" {
+		case verifyParam, ok := <-self.verifyTxQueue:
+			if !ok || verifyParam.TxHash == "" {
 				close(self.closeChan)
 				log.Info("close(self.closeChan), verify over")
 				return
 			}
-			boo := mana.VerifyTx(hash)
+			boo := mana.VerifyTx(verifyParam.TxHash)
 			if !boo {
 				//save failed tx to bonus_db
-				err := bonus_db.UpdateTxResultByTxHash(hash, common.TxFailed, 0)
+				err := bonus_db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, common.TxFailed, 0, "Verify failed")
 				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, hash)
+					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
 				}
-				log.Errorf("VerifyTx failed, txhash: %s", hash)
+				log.Errorf("VerifyTx failed, txhash: %s", verifyParam.TxHash)
 				continue
 			}
-			ti, err := mana.GetTxTime(hash)
+			ti, err := mana.GetTxTime(verifyParam.TxHash)
 			if err != nil {
 				log.Errorf("GetTxTime error: %s", err)
 				continue
 			}
 			//update bonus_db
-			err = bonus_db.UpdateTxResultByTxHash(hash, common.TxSuccess, ti)
+			err = bonus_db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, common.TxSuccess, ti, "success")
 			if err != nil {
-				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, hash)
+				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
 			}
-			log.Debugf("verify tx success, txhash: %s", hash)
+			log.Debugf("verify tx success, txhash: %s", verifyParam.TxHash)
 		}
 	}
 }

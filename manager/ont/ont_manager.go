@@ -254,9 +254,10 @@ func (self *OntManager) EstimateFee() (string, error) {
 	fee := float64(len(self.eatp.BillList)) * 0.01
 	return strconv.FormatFloat(fee, 'f', -1, 64), nil
 }
+
 func (self *OntManager) ComputeSum() (string, error) {
 	sum := uint64(0)
-	if self.eatp.TokenType == config.ONT || self.eatp.TokenType == config.ONG {
+	if self.eatp.TokenType == config.ONT {
 		for _, item := range self.eatp.BillList {
 			val, err := strconv.ParseUint(item.Amount, 10, 64)
 			if err != nil {
@@ -265,6 +266,14 @@ func (self *OntManager) ComputeSum() (string, error) {
 			sum += val
 		}
 		return strconv.FormatUint(sum, 10), nil
+	} else if self.eatp.TokenType == config.ONG {
+		for _, item := range self.eatp.BillList {
+			val := utils.ParseAssetAmount(item.Amount, 9)
+			sum += val
+		}
+		temp := new(big.Int)
+		temp.SetUint64(sum)
+		return utils.ToStringByPrecise(temp, uint64(9)), nil
 	} else if self.eatp.TokenType == config.OEP4 {
 		for _, item := range self.eatp.BillList {
 			val := utils.ParseAssetAmount(item.Amount, self.precision)

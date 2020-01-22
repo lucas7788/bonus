@@ -188,11 +188,13 @@ func (self *EthManager) AppendParam(param *common2.TransferParam) {
 
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
-	for _, trParam := range self.eatp.BillList {
-		self.txHandleTask.TransferQueue <- trParam
-	}
-	close(self.txHandleTask.TransferQueue)
-	self.txHandleTask.WaitClose()
+	go func() {
+		for _, trParam := range self.eatp.BillList {
+			self.txHandleTask.TransferQueue <- trParam
+		}
+		close(self.txHandleTask.TransferQueue)
+		self.txHandleTask.WaitClose()
+	}()
 }
 
 func (self *EthManager) GetStatus() common2.TransferStatus {

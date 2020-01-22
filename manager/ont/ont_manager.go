@@ -99,15 +99,18 @@ func (self *OntManager) InertSql() {
 }
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
-	for _, trParam := range self.eatp.BillList {
-		self.txHandleTask.TransferQueue <- trParam
-	}
-	close(self.txHandleTask.TransferQueue)
-	self.txHandleTask.WaitClose()
+	go func() {
+		for _, trParam := range self.eatp.BillList {
+			self.txHandleTask.TransferQueue <- trParam
+		}
+		close(self.txHandleTask.TransferQueue)
+		self.txHandleTask.WaitClose()
+	}()
 }
 
 func (self *OntManager) GetStatus() common2.TransferStatus {
 	if self.txHandleTask == nil {
+		log.Info("self.txHandleTask is nil")
 		return common2.NotTransfer
 	}
 	return self.txHandleTask.TransferStatus
@@ -116,6 +119,7 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 func (self *OntManager) StartHandleTxTask() {
 	txHandleTask := transfer.NewTxHandleTask()
 	self.txHandleTask = txHandleTask
+	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
 	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }

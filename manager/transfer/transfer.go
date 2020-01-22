@@ -46,7 +46,7 @@ func (self *TxHandleTask) WaitClose() {
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("recover info: ", r)
+			log.Error("StartHandleTransferTask recover info: ", r)
 		}
 	}()
 	for {
@@ -54,9 +54,10 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 		case param, ok := <-self.TransferQueue:
 			if !ok || param == nil {
 				close(self.verifyTxQueue)
-				log.Infof("close(self.verifyTxQueue)")
+				log.Infof("1. close(self.verifyTxQueue)")
 				self.closeChan <- true
 				<-self.waitVerify
+				log.Info("exit StartHandleTransferTask gorountine")
 				return
 			}
 			var txHex []byte
@@ -167,7 +168,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("recover info: ", r)
+			log.Error("StartVerifyTxTask recover info: ", r)
 		}
 	}()
 	for {
@@ -175,9 +176,8 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 		case verifyParam, ok := <-self.verifyTxQueue:
 			if !ok || verifyParam.TxHash == "" {
 				self.TransferStatus = common.Transfered
-				close(self.closeChan)
-				log.Info("close(self.closeChan), verify over")
 				self.waitVerify <- true
+				log.Info("exit StartVerifyTxTask gorountine")
 				return
 			}
 			boo := mana.VerifyTx(verifyParam.TxHash)

@@ -150,28 +150,28 @@ func GetDataByEventType(ctx *routing.Context) error {
 		txInfo, err = bonus_db.QueryResultByEventType(ty, txInfo)
 		if err != nil {
 			log.Errorf("QueryResultByEventType error: %s", err)
-			return writeResponse(ctx, QueryResultByEventType)
+			return writeResponse(ctx, ResponsePack(QueryResultByEventType))
 		}
 		eatp := ParseTxInfoToEatp(txInfo)
 		mgr, err := manager.InitManager(eatp)
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
-			return writeResponse(ctx, InitManagerError)
+			return writeResponse(ctx, ResponsePack(InitManagerError))
 		}
 		eatp.Sum, err = mgr.ComputeSum()
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
-			return writeResponse(ctx, SumError)
+			return writeResponse(ctx, ResponsePack(SumError))
 		}
 		ba, err := mgr.GetAdminBalance()
 		if err != nil {
 			log.Errorf("GetAdminBalance error: %s", err)
-			return writeResponse(ctx, GetAdminBalanceError)
+			return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 		}
 		fee, err := mgr.EstimateFee()
 		if err != nil {
 			log.Errorf("EstimateFee error: %s", err)
-			return writeResponse(ctx, EstimateFeeError)
+			return writeResponse(ctx, ResponsePack(EstimateFeeError))
 		}
 		res = append(res, &common.GetDataByEventType{
 			TxInfo:          txInfo,

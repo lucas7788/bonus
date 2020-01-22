@@ -150,7 +150,6 @@ func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInf
 	return nil, nil
 }
 
-
 func QueryFailedTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInfo, error) {
 	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and TxResult != ?"
 	stmt, err := DefDB.Prepare(strSql)

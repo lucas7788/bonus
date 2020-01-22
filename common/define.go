@@ -29,13 +29,21 @@ type GetDataByEventType struct {
 	ContractAddress string
 }
 
+type TransferStatus byte
+
+const (
+	NotTransfer TransferStatus = iota
+	Transfering
+	Transfered
+)
+
 type TxResult byte
 
 const (
 	NotBuild TxResult = iota //
 	BuildTxFailed
 	SendFailed
-	SendSuccess
+	OneTransfering
 	TxFailed
 	TxSuccess
 )

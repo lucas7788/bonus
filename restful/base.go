@@ -26,6 +26,7 @@ var ErrMap = map[int64]string{
 	GetAdminBalanceError:   "GetAdminBalanceError",
 	ExcelDuplicateAddress:  "ExcelDuplicateAddress",
 	AmountIsNegative:       "AmountIsNegative",
+	Transfering:            "Transfering",
 }
 
 const (
@@ -44,4 +45,5 @@ const (
 	GetAdminBalanceError   = 40011
 	ExcelDuplicateAddress  = 40012
 	AmountIsNegative       = 40013
+	Transfering            = 40014
 )

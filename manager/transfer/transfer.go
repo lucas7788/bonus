@@ -16,7 +16,9 @@ type TxHandleTask struct {
 	verifyTxQueue      chan *VerifyParam
 	hasTransferedOntid map[string]bool
 	closeChan          chan bool
+	waitVerify         chan bool
 	rwLock             *sync.RWMutex
+	TransferStatus     common.TransferStatus
 }
 
 type VerifyParam struct {
@@ -29,8 +31,11 @@ func NewTxHandleTask() *TxHandleTask {
 	transferQueue := make(chan *common.TransferParam, config.TRANSFER_QUEUE_SIZE)
 	verifyQueue := make(chan *VerifyParam, config.VERIFY_TX_QUEUE_SIZE)
 	return &TxHandleTask{
-		TransferQueue: transferQueue,
-		verifyTxQueue: verifyQueue,
+		TransferQueue:  transferQueue,
+		verifyTxQueue:  verifyQueue,
+		TransferStatus: common.Transfering,
+		closeChan:      make(chan bool),
+		waitVerify:     make(chan bool),
 	}
 }
 
@@ -50,6 +55,8 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			if !ok || param == nil {
 				close(self.verifyTxQueue)
 				log.Infof("close(self.verifyTxQueue)")
+				self.closeChan <- true
+				<-self.waitVerify
 				return
 			}
 			var txHex []byte
@@ -64,8 +71,15 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			}
 			//if tx verify failed, here should be verify again
 			if (txInfo != nil && txInfo.TxResult == common.TxFailed && txInfo.TxHash != "") ||
-				(txInfo != nil && txInfo.TxResult == common.SendSuccess && txInfo.TxHash != "") ||
+				(txInfo != nil && txInfo.TxResult == common.OneTransfering && txInfo.TxHash != "") ||
 				(txInfo != nil && txInfo.TxResult == common.SendFailed && txInfo.TxHash != "") {
+
+				err = bonus_db.UpdateTxResult(eventType, param.Address, common.OneTransfering, 0, "")
+				if err != nil {
+					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
+						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
+				}
+
 				boo := mana.VerifyTx(txInfo.TxHash)
 				if boo {
 					log.Infof("Failed transactions revalidate success, txhash: %s", txInfo.TxHash)
@@ -103,6 +117,11 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					continue
 				}
 				log.Debugf("tx build success, txhash: %s", txHash)
+				err := bonus_db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.OneTransfering, eventType, param.Address)
+				if err != nil {
+					log.Errorf("UpdateTxInfo error: %s, event type:%s, address: %s", err, eventType, param.Address)
+					continue
+				}
 			}
 
 			//send tx
@@ -129,10 +148,10 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				continue
 			} else {
 				//save txHex
-				err = bonus_db.UpdateTxResult(eventType, param.Address, common.SendSuccess, 0, "")
+				err = bonus_db.UpdateTxResult(eventType, param.Address, common.OneTransfering, 0, "")
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
-						err, eventType, param.Address, txInfo.TxHash, byte(common.SendSuccess))
+						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
 				}
 			}
 			log.Debugf("tx send success, txhash: %s", txInfo.TxHash)
@@ -155,8 +174,10 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 		select {
 		case verifyParam, ok := <-self.verifyTxQueue:
 			if !ok || verifyParam.TxHash == "" {
+				self.TransferStatus = common.Transfered
 				close(self.closeChan)
 				log.Info("close(self.closeChan), verify over")
+				self.waitVerify <- true
 				return
 			}
 			boo := mana.VerifyTx(verifyParam.TxHash)

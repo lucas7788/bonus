@@ -191,6 +191,15 @@ func (self *EthManager) StartTransfer() {
 	for _, trParam := range self.eatp.BillList {
 		self.txHandleTask.TransferQueue <- trParam
 	}
+	close(self.txHandleTask.TransferQueue)
+	self.txHandleTask.WaitClose()
+}
+
+func (self *EthManager) GetStatus() common2.TransferStatus {
+	if self.txHandleTask == nil {
+		return common2.NotTransfer
+	}
+	return self.txHandleTask.TransferStatus
 }
 
 func (self *EthManager) StartHandleTxTask() {

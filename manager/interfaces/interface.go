@@ -1,5 +1,7 @@
 package interfaces
 
+import "github.com/ontio/bonus/common"
+
 type WithdrawManager interface {
 	NewWithdrawTx(destAddr string, amount string) (string, []byte, error)
 	SendTx(txHex []byte) (string, error)
@@ -13,4 +15,5 @@ type WithdrawManager interface {
 	GetAdminBalance() (string, error)
 	WithdrawToken(address string) error
 	ComputeSum() (string, error)
+	GetStatus() common.TransferStatus
 }

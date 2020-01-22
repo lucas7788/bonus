@@ -32,8 +32,8 @@ type GetDataByEventType struct {
 type TxResult byte
 
 const (
-	BuildTxFailed TxResult = iota //
-	NotSend
+	NotBuild TxResult = iota //
+	BuildTxFailed
 	SendFailed
 	SendSuccess
 	TxFailed

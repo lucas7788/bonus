@@ -54,7 +54,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			}
 			var txHex []byte
 			var err error
-			txInfo, err := bonus_db.QueryTxHexByExcelAndAddr(eventType, param.Address)
+			txInfo, err := bonus_db.QueryFailedTxHexByExcelAndAddr(eventType, param.Address)
 			if err != nil {
 				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
 				continue
@@ -89,9 +89,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					continue
 				}
 			}
-			if txInfo == nil {
-				txInfo = &common.TransactionInfo{}
-			}
+
 			//build tx
 			if txHex == nil {
 				var txHash string
@@ -104,30 +102,8 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					}
 					continue
 				}
-				//Avoid repetitive insert
-				if txInfo == nil {
-					err := bonus_db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.NotSend, eventType, param.Address)
-					if err != nil {
-						log.Errorf("UpdateTxInfo error: %s, eventType: %s, address: %s", err, eventType, param.Address)
-						continue
-					}
-				} else {
-					err = bonus_db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.NotSend, eventType, param.Address)
-					if err != nil {
-						log.Errorf("UpdateTxInfo failed, eventType: %s,txhash: %s, txHex: %s error: %s",
-							eventType, txHash, common2.ToHexString(txHex), err)
-						continue
-					}
-				}
-
 				log.Debugf("tx build success, txhash: %s", txHash)
-				//update receive txhash
-				txInfo.TxHash = txHash
-				log.Debugf("InsertTransactionInfo success, eventType: %s, address: %s, txHash: %s",
-					eventType, param.Address, txHash)
 			}
-
-			log.Debugf("tx build success, txHash: %s, txHex: %s", txInfo.TxHash, common2.ToHexString(txHex))
 
 			//send tx
 			retry := 0

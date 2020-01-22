@@ -150,8 +150,40 @@ func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInf
 	return nil, nil
 }
 
+
+func QueryFailedTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInfo, error) {
+	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and TxResult != ?"
+	stmt, err := DefDB.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query(eventType, address, common.TxSuccess)
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var txHash, txHex string
+		var txResult int
+		if err = rows.Scan(&txHash, &txHex, &txResult); err != nil {
+			return nil, err
+		}
+		return &common.TransactionInfo{
+			TxHash:   txHash,
+			TxHex:    txHex,
+			TxResult: common.TxResult(txResult),
+		}, nil
+	}
+	return nil, nil
+}
+
 func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]*common.TransactionInfo, error) {
-	strSql := "select TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult from bonus_transaction_info where EventType = ?"
+	strSql := "select TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -167,10 +199,10 @@ func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]
 		return nil, err
 	}
 	for rows.Next() {
-		var txHash, tokenType, contractAddress, address, amount string
+		var txHash, tokenType, contractAddress, address, amount, errorDetail string
 		var txResult byte
 		var txTime uint32
-		if err = rows.Scan(&tokenType, &contractAddress, &address, &amount, &txHash, &txTime, &txResult); err != nil {
+		if err = rows.Scan(&tokenType, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
 			return nil, err
 		}
 		res = append(res, &common.TransactionInfo{
@@ -182,6 +214,7 @@ func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]
 			TxHash:          txHash,
 			TxTime:          txTime,
 			TxResult:        common.TxResult(txResult),
+			ErrorDetail:     errorDetail,
 		})
 	}
 	return res, nil

@@ -101,6 +101,7 @@ func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
 		for _, trParam := range self.eatp.BillList {
+
 			self.txHandleTask.TransferQueue <- trParam
 		}
 		close(self.txHandleTask.TransferQueue)

@@ -150,37 +150,6 @@ func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInf
 	return nil, nil
 }
 
-func QueryFailedTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInfo, error) {
-	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and TxResult != ?"
-	stmt, err := DefDB.Prepare(strSql)
-	if stmt != nil {
-		defer stmt.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-	rows, err := stmt.Query(eventType, address, common.TxSuccess)
-	if rows != nil {
-		defer rows.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var txHash, txHex string
-		var txResult int
-		if err = rows.Scan(&txHash, &txHex, &txResult); err != nil {
-			return nil, err
-		}
-		return &common.TransactionInfo{
-			TxHash:   txHash,
-			TxHex:    txHex,
-			TxResult: common.TxResult(txResult),
-		}, nil
-	}
-	return nil, nil
-}
-
 func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]*common.TransactionInfo, error) {
 	strSql := "select TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 	stmt, err := DefDB.Prepare(strSql)

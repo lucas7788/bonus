@@ -44,11 +44,11 @@ func (self *TxHandleTask) WaitClose() {
 }
 
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error("StartHandleTransferTask recover info: ", r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		log.Error("StartHandleTransferTask recover info: ", r)
+	//	}
+	//}()
 	for {
 		select {
 		case param, ok := <-self.TransferQueue:
@@ -62,7 +62,8 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			}
 			var txHex []byte
 			var err error
-			txInfo, err := bonus_db.QueryFailedTxHexByExcelAndAddr(eventType, param.Address)
+			txInfo, err := bonus_db.QueryTxHexByExcelAndAddr(eventType, param.Address)
+
 			if err != nil {
 				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
 				continue
@@ -139,7 +140,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				}
 			}
 			if err != nil || hash == "" {
-				log.Errorf("SendTx error: %s, txhash: %s", err, txInfo.TxHash)
+				log.Errorf("SendTx error: %s, txhash: %s", err, hash)
 				//save txHex
 				err = bonus_db.UpdateTxResult(eventType, param.Address, common.SendFailed, 00, err.Error())
 				if err != nil {
@@ -155,7 +156,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
 				}
 			}
-			log.Debugf("tx send success, txhash: %s", txInfo.TxHash)
+			log.Debugf("tx send success, txhash: %s", hash)
 			self.verifyTxQueue <- &VerifyParam{
 				TxHash:    hash,
 				Address:   param.Address,
@@ -166,11 +167,11 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 }
 
 func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error("StartVerifyTxTask recover info: ", r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		log.Error("StartVerifyTxTask recover info: ", r)
+	//	}
+	//}()
 	for {
 		select {
 		case verifyParam, ok := <-self.verifyTxQueue:

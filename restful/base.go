@@ -27,6 +27,7 @@ var ErrMap = map[int64]string{
 	ExcelDuplicateAddress:  "ExcelDuplicateAddress",
 	AmountIsNegative:       "AmountIsNegative",
 	Transfering:            "Transfering",
+	BalanceIsNotEnough:     "BalanceIsNotEnough",
 }
 
 const (
@@ -46,4 +47,5 @@ const (
 	ExcelDuplicateAddress  = 40012
 	AmountIsNegative       = 40013
 	Transfering            = 40014
+	BalanceIsNotEnough     = 40015
 )

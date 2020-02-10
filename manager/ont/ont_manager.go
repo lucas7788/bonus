@@ -89,9 +89,13 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam) (*OntManager, erro
 	return ontManager, nil
 }
 
-func (self *OntManager) VerifyAddress(address string) error {
+func (self *OntManager) VerifyAddress(address string) bool {
 	_, err := common.AddressFromBase58(address)
-	return err
+	if err != nil {
+		log.Errorf("ont VerifyAddress failed, address: %s", address)
+		return false
+	}
+	return true
 }
 
 func (self *OntManager) InertSql() {
@@ -126,7 +130,29 @@ func (self *OntManager) StartHandleTxTask() {
 }
 
 func (self *OntManager) WithdrawToken(address string) error {
-	_, txHex, err := self.NewWithdrawTx(address, "")
+	bal, err := self.GetAdminBalance()
+	if err != nil {
+		return fmt.Errorf("GetAdminBalance faied, error: %s", err)
+	}
+	var amt string
+	if self.eatp.TokenType == config.ONT {
+		amt = bal
+	} else if self.eatp.TokenType == config.ONG {
+		value := utils.ParseAssetAmount(bal, config.ONG_DECIMALS)
+		fee := utils.ParseAssetAmount("0.01", config.ONG_DECIMALS)
+		if value < fee {
+			return fmt.Errorf("balance is less than fee, balance: %s, fee:%s", bal, "0.01")
+		}
+		transferAmt := value - fee
+		b := new(big.Int)
+		b.SetUint64(transferAmt)
+		amt = utils.ToStringByPrecise(b, config.ONG_DECIMALS)
+	} else if self.eatp.TokenType == config.OEP4 {
+		amt = bal
+	} else {
+		return fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+	}
+	_, txHex, err := self.NewWithdrawTx(address, amt)
 	if err != nil {
 		log.Errorf("NewWithdrawTx failed, error: %s", err)
 		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)

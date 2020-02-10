@@ -8,6 +8,7 @@ const (
 	POST_EXECL                      = "/api/v1/uploadexecl"
 	POST_TRANSFER                   = "/api/v1/transfer"
 	POST_DATA_BY_EVENT_TYPE         = "/api/v1/getdatabyeventtype"
+	POST_WITHDRAW                   = "/api/v1/withdraw"
 	GET_ALL_EVENT_TYPE              = "/api/v1/getalleventtype"
 	GET_ADMIN_BALANCE_BY_EVENT_TYPE = "/api/v1/getadminbalancebyeventtype/<eventtype>"
 )
@@ -19,6 +20,7 @@ func InitRouter() *routing.Router {
 	router.Post(POST_EXECL, UpLoadExcel)
 	router.Post(POST_TRANSFER, Transfer)
 	router.Post(POST_DATA_BY_EVENT_TYPE, GetDataByEventType)
+	router.Post(POST_WITHDRAW, Withdraw)
 	router.Get(GET_ADMIN_BALANCE_BY_EVENT_TYPE, GetAdminBalanceByEventType)
 	router.Get(GET_ALL_EVENT_TYPE, GetAllEventType)
 	return router

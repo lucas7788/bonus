@@ -112,12 +112,13 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam) (*EthManager, erro
 	return mgr, nil
 }
 
-func (self *EthManager) VerifyAddress(address string) error {
+func (self *EthManager) VerifyAddress(address string) bool {
 	boo := ethComm.IsHexAddress(address)
 	if !boo {
-		return fmt.Errorf("VerifyAddress error: %s", address)
+		log.Errorf("eth VerifyAddress failed, address: %s", address)
+		return false
 	}
-	return nil
+	return true
 }
 
 func (self *EthManager) GetAdminAddress() string {
@@ -163,7 +164,18 @@ func (self *EthManager) WithdrawToken(address string) error {
 		if err != nil {
 			return err
 		}
-		self.NewWithdrawTx(address, ba)
+		hash, txHex, err := self.NewWithdrawTx(address, ba)
+		if hash == "" || txHex == nil || err != nil {
+			return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
+		}
+		hash, err = self.SendTx(txHex)
+		if err != nil {
+			return fmt.Errorf("send tx failed, error:%s", err)
+		}
+		boo := self.VerifyTx(hash)
+		if !boo {
+			return fmt.Errorf("verify tx failed")
+		}
 	}
 	return nil
 }

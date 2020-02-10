@@ -93,6 +93,32 @@ func Transfer(ctx *routing.Context) error {
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
+func Withdraw(ctx *routing.Context) error {
+	eventType, address, errCode := ParseWithdrawParam(ctx)
+	if errCode != SUCCESS || eventType == "" || address == "" {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	mgr, errCode := parseMgr(eventType)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	if mgr.VerifyAddress(address) == false {
+		return writeResponse(ctx, ResponsePack(AddressIsWrong))
+	}
+	log.Info("transfer status:", mgr.GetStatus())
+	if mgr.GetStatus() == common.Transfering {
+		return writeResponse(ctx, ResponsePack(Transfering))
+	}
+	err := mgr.WithdrawToken(address)
+	if err != nil {
+		log.Errorf("WithdrawToken failed, error: %s", err)
+		res := ResponsePack(WithdrawTokenFailed)
+		res["Result"] = err
+		return writeResponse(ctx, res)
+	}
+	return writeResponse(ctx, ResponsePack(SUCCESS))
+}
+
 func GetAllEventType(ctx *routing.Context) error {
 	eventType, err := bonus_db.QueryAllEventType()
 	if err != nil {

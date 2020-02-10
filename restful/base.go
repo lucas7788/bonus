@@ -28,6 +28,8 @@ var ErrMap = map[int64]string{
 	AmountIsNegative:       "AmountIsNegative",
 	Transfering:            "Transfering",
 	BalanceIsNotEnough:     "BalanceIsNotEnough",
+	AddressIsWrong:         "AddressIsWrong",
+	WithdrawTokenFailed:    "WithdrawTokenFailed",
 }
 
 const (
@@ -48,4 +50,6 @@ const (
 	AmountIsNegative       = 40013
 	Transfering            = 40014
 	BalanceIsNotEnough     = 40015
+	AddressIsWrong         = 40016
+	WithdrawTokenFailed    = 40017
 )

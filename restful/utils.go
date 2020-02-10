@@ -48,6 +48,29 @@ func ParseTransferParam(ctx *routing.Context) (string, int64) {
 	}
 	return pa, SUCCESS
 }
+func ParseWithdrawParam(ctx *routing.Context) (string, string, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return "", "", errCode
+	}
+	eventType, ok := param["eventType"]
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	evtType, ok := eventType.(string)
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	address, ok := param["address"]
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	addr, ok := address.(string)
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	return evtType, addr, SUCCESS
+}
 
 func parse(ctx *routing.Context) (map[string]interface{}, int64) {
 	req := ctx.PostBody()

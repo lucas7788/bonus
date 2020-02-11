@@ -202,6 +202,9 @@ func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
 		for _, trParam := range self.eatp.BillList {
+			if trParam.Amount == "0" {
+				continue
+			}
 			self.txHandleTask.TransferQueue <- trParam
 		}
 		close(self.txHandleTask.TransferQueue)

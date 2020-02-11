@@ -66,9 +66,9 @@ func InsertSql(args *common.ExcelParam) error {
 	sqlStrArr := make([]string, 0)
 	temp := make([]string, 0)
 	for _, bill := range args.BillList {
-		if common.IsHave(temp, args.EventType+bill.Address) {
-			continue
-		}
+		//if common.IsHave(temp, args.EventType+bill.Address) {
+		//	continue
+		//}
 		temp = append(temp, args.EventType+bill.Address)
 		txInfo, err := QueryTxHexByExcelAndAddr(args.EventType, bill.Address)
 		if err != nil {

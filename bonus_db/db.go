@@ -64,19 +64,19 @@ func QueryAllEventType() ([]string, error) {
 
 func InsertSql(args *common.ExcelParam) error {
 	sqlStrArr := make([]string, 0)
-	temp := make([]string, 0)
+	//temp := make([]string, 0)
 	for _, bill := range args.BillList {
 		//if common.IsHave(temp, args.EventType+bill.Address) {
 		//	continue
 		//}
-		temp = append(temp, args.EventType+bill.Address)
-		txInfo, err := QueryTxHexByExcelAndAddr(args.EventType, bill.Address)
-		if err != nil {
-			return err
-		}
-		if txInfo != nil {
-			continue
-		}
+		//temp = append(temp, args.EventType+bill.Address)
+		//txInfo, err := QueryTxHexByExcelAndAddr(args.EventType, bill.Address)
+		//if err != nil {
+		//	return err
+		//}
+		//if txInfo != nil {
+		//	continue
+		//}
 		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s')", args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
@@ -93,8 +93,8 @@ func InsertSql(args *common.ExcelParam) error {
 	return nil
 }
 
-func UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, address string) error {
-	strSql := "update bonus_transaction_info set TxHash=?,TxHex=?,TxResult=? where EventType = ? and Address = ?"
+func UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, address string, id int) error {
+	strSql := "update bonus_transaction_info set TxHash=?,TxHex=?,TxResult=? where EventType = ? and Address = ? and id = ?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -102,12 +102,12 @@ func UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, add
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Exec(txHash, TxHex, txResult, eventType, address)
+	_, err = stmt.Exec(txHash, TxHex, txResult, eventType, address, id)
 	return err
 }
 
-func UpdateTxResult(eventType, address string, txResult common.TxResult, txTime uint32, errDetail string) error {
-	strSql := "update bonus_transaction_info set TxResult=?, TxTime=?, ErrorDetail= ? where EventType = ? and Address = ?"
+func UpdateTxResult(eventType, address string, id int, txResult common.TxResult, txTime uint32, errDetail string) error {
+	strSql := "update bonus_transaction_info set TxResult=?, TxTime=?, ErrorDetail= ? where EventType = ? and Address = ? and id=?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -115,12 +115,12 @@ func UpdateTxResult(eventType, address string, txResult common.TxResult, txTime 
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Exec(txResult, txTime, errDetail, eventType, address)
+	_, err = stmt.Exec(txResult, txTime, errDetail, eventType, address, id)
 	return err
 }
 
-func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInfo, error) {
-	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=?"
+func QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {
+	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and Id=?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -128,7 +128,7 @@ func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInf
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query(eventType, address)
+	rows, err := stmt.Query(eventType, address, id)
 	if rows != nil {
 		defer rows.Close()
 	}
@@ -151,7 +151,7 @@ func QueryTxHexByExcelAndAddr(eventType, address string) (*common.TransactionInf
 }
 
 func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]*common.TransactionInfo, error) {
-	strSql := "select TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
+	strSql := "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -170,10 +170,12 @@ func QueryResultByEventType(eventType string, res []*common.TransactionInfo) ([]
 		var txHash, tokenType, contractAddress, address, amount, errorDetail string
 		var txResult byte
 		var txTime uint32
-		if err = rows.Scan(&tokenType, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
+		var id int
+		if err = rows.Scan(&id, &tokenType, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
 			return nil, err
 		}
 		res = append(res, &common.TransactionInfo{
+			Id:              id,
 			EventType:       eventType,
 			TokenType:       tokenType,
 			ContractAddress: contractAddress,

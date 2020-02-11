@@ -178,6 +178,7 @@ func ParseTxInfoToEatp(txInfo []*common.TransactionInfo) *common.ExcelParam {
 	billList := make([]*common.TransferParam, 0)
 	for _, item := range txInfo {
 		billList = append(billList, &common.TransferParam{
+			Id:      item.Id,
 			Address: item.Address,
 			Amount:  item.Amount,
 		})

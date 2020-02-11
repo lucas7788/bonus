@@ -1,11 +1,13 @@
 package common
 
 type TransferParam struct {
+	Id      int
 	Address string
 	Amount  string
 }
 
 type TransactionInfo struct {
+	Id              int
 	EventType       string
 	TokenType       string
 	ContractAddress string

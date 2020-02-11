@@ -149,7 +149,8 @@ func GetAdminBalanceByEventType(ctx *routing.Context) error {
 func parseMgr(eventType string) (interfaces.WithdrawManager, int64) {
 	var mgr interfaces.WithdrawManager
 	mn, ok := DefBonusMap.Load(eventType)
-	if !ok || mn == nil {
+	//TODO
+	if !ok || mn == nil || true {
 		res := make([]*common.TransactionInfo, 0)
 		var err error
 		res, err = bonus_db.QueryResultByEventType(eventType, res)

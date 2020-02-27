@@ -6,6 +6,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
+	"github.com/ontio/ontology/common/log"
 	"strings"
 )
 
@@ -29,6 +30,27 @@ func ConnectDB() error {
 	return nil
 }
 
+func ConnectDBTest() error {
+	BonusDBUser := "root"
+	BonusDBPassword := "111111"
+	BonusDBUrl := "127.0.0.1:3306"
+	BonusDBName := "bonus"
+	db, dberr := sql.Open("mysql",
+		BonusDBUser+
+			":"+BonusDBPassword+
+			"@tcp("+BonusDBUrl+
+			")/"+BonusDBName+
+			"?charset=utf8")
+	if dberr != nil {
+		return dberr
+	}
+	err := db.Ping()
+	if err != nil {
+		return err
+	}
+	DefDB = db
+	return nil
+}
 func CloseDB() {
 	DefDB.Close()
 }
@@ -64,19 +86,7 @@ func QueryAllEventType() ([]string, error) {
 
 func InsertSql(args *common.ExcelParam) error {
 	sqlStrArr := make([]string, 0)
-	//temp := make([]string, 0)
 	for _, bill := range args.BillList {
-		//if common.IsHave(temp, args.EventType+bill.Address) {
-		//	continue
-		//}
-		//temp = append(temp, args.EventType+bill.Address)
-		//txInfo, err := QueryTxHexByExcelAndAddr(args.EventType, bill.Address)
-		//if err != nil {
-		//	return err
-		//}
-		//if txInfo != nil {
-		//	continue
-		//}
 		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s')", args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
@@ -90,7 +100,38 @@ func InsertSql(args *common.ExcelParam) error {
 	if err != nil {
 		return err
 	}
+	for _, bill := range args.BillList {
+		id, err := QueryId(args.EventType, bill.Address)
+		if err != nil || id == 0 {
+			log.Errorf("QueryId error: %s", err)
+			return err
+		}
+		bill.Id = id
+	}
 	return nil
+}
+
+func QueryId(eventType string, address string) (int, error) {
+	strSql := "select Id from bonus_transaction_info where EventType=? and Address= ?"
+	stmt, err := DefDB.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	rows, err := stmt.Query(eventType, address)
+	if rows != nil {
+		defer rows.Close()
+	}
+	for rows.Next() {
+		var id int
+		if err = rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+	return 0, nil
 }
 
 func UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, address string, id int) error {

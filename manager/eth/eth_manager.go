@@ -378,14 +378,13 @@ func (this *EthManager) VerifyTx(txHash string) bool {
 		if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
 			return true
 		}
-		if err != nil && err.Error() == "not found" {
-			return false
-		}
+
 		if err != nil && retry < config.EthRetryLimit {
 			retry += 1
 			time.Sleep(time.Duration(retry*config.EthSleepTime) * time.Second)
 			continue
 		}
+
 		if err != nil && retry >= config.EthRetryLimit {
 			log.Errorf("retry: %d,TransactionReceipt error: %s", retry, err)
 			return false

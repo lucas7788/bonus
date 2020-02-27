@@ -31,7 +31,7 @@ import (
 
 var (
 	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000001", config.ETH_DECIMALS) // 10 Gwei
-	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.0001", config.ETH_DECIMALS)
+	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", config.ETH_DECIMALS)
 )
 
 type Token struct {

@@ -126,6 +126,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					log.Errorf("UpdateTxInfo error: %s, event type:%s, address: %s", err, eventType, param.Address)
 					continue
 				}
+				log.Infof("txHash:%s, txHex:%s, address:%s, amount:%s", txHash, common2.ToHexString(txHex), param.Address, param.Amount)
 			}
 
 			//send tx

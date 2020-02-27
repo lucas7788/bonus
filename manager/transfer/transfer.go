@@ -158,7 +158,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
 				}
 			}
-			log.Debugf("tx send success, txhash: %s", hash)
+			log.Infof("tx send success, txhash: %s", hash)
 			self.verifyTxQueue <- &VerifyParam{
 				Id:        param.Id,
 				TxHash:    hash,

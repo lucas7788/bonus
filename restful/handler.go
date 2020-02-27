@@ -150,7 +150,7 @@ func parseMgr(eventType string) (interfaces.WithdrawManager, int64) {
 	var mgr interfaces.WithdrawManager
 	mn, ok := DefBonusMap.Load(eventType)
 	//TODO
-	if !ok || mn == nil || true {
+	if !ok || mn == nil {
 		res := make([]*common.TransactionInfo, 0)
 		var err error
 		res, err = bonus_db.QueryResultByEventType(eventType, res)
@@ -188,10 +188,17 @@ func GetDataByEventType(ctx *routing.Context) error {
 			return writeResponse(ctx, ResponsePack(QueryResultByEventType))
 		}
 		eatp := ParseTxInfoToEatp(txInfo)
-		mgr, err := manager.InitManager(eatp)
-		if err != nil {
-			log.Errorf("InitManager error: %s", err)
-			return writeResponse(ctx, ResponsePack(InitManagerError))
+		mn, ok := DefBonusMap.Load(eatp.EventType)
+		var mgr interfaces.WithdrawManager
+		if ok && mn != nil {
+			mgr, _ = mn.(interfaces.WithdrawManager)
+		} else {
+			mgr, err = manager.InitManager(eatp)
+			if err != nil {
+				log.Errorf("InitManager error: %s", err)
+				return writeResponse(ctx, ResponsePack(InitManagerError))
+			}
+			DefBonusMap.Store(eatp.EventType, mgr)
 		}
 		eatp.Sum, err = mgr.ComputeSum()
 		if err != nil {

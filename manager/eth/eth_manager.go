@@ -26,7 +26,6 @@ import (
 	"github.com/ontio/bonus/utils"
 	"github.com/ontio/ontology/common/log"
 	"os"
-	"strconv"
 )
 
 var (
@@ -141,9 +140,19 @@ func (self *EthManager) GetAdminBalance() (string, error) {
 }
 
 func (self *EthManager) EstimateFee() (string, error) {
-	oneFee := float64(0.0000352)
-	res := float64(len(self.eatp.BillList)) * oneFee
-	return strconv.FormatFloat(res, 'f', 9, 64), nil
+
+	contractAddr := ethComm.HexToAddress(self.eatp.ContractAddress)
+	adminAddr := self.GetAdminAddress()
+	adminAddress := ethComm.HexToAddress(adminAddr)
+	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
+	gaslimit, err := self.estimateGasLimit(contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
+	if err != nil {
+		return "", err
+	}
+	gasLimi := new(big.Int).SetUint64(gaslimit)
+	gas := gasLimi.Mul(gasLimi, DEFAULT_GAS_PRICE)
+	gasTotal := gas.Mul(gas, new(big.Int).SetUint64(uint64(len(self.eatp.BillList))))
+	return utils.ToStringByPrecise(gasTotal, config.ETH_DECIMALS), nil
 }
 
 func (self *EthManager) ComputeSum() (string, error) {
@@ -270,30 +279,50 @@ func (this *EthManager) NewWithdrawTx(destAddr string, amount string) (string, [
 	}
 }
 
+func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (uint64, error) {
+	if this.eatp.TokenType == config.ETH {
+		callMsg := ethereum.CallMsg{
+			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
+			Value: amount, Data: []byte{},
+		}
+		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
+		if err != nil {
+			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
+		}
+		return gasLimit, nil
+	} else {
+		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
+		if err != nil {
+			return 0, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
+		}
+		callMsg := ethereum.CallMsg{
+			From: this.account.Address, To: &contractAddr, Gas: 0, GasPrice: gasPrice,
+			Value: big.NewInt(0), Data: txData,
+		}
+		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
+		if err != nil {
+			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
+		}
+		return gasLimit, nil
+	}
+}
+
 func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (string, []byte, error) {
 	txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 	if err != nil {
 		return "", nil, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
 	}
-	callMsg := ethereum.CallMsg{
-		From: this.account.Address, To: &contractAddr, Gas: 0, GasPrice: gasPrice,
-		Value: big.NewInt(0), Data: txData,
-	}
-	gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
+	gasLimit, err := this.estimateGasLimit(contractAddr, to, amount, gasPrice)
 	if err != nil {
-		return "", nil, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
+		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
 	return this.newTx(contractAddr, big.NewInt(0), gasLimit, gasPrice, txData)
 }
 
 func (this *EthManager) newWithdrawEthTx(to ethComm.Address, amount *big.Int, gasPrice *big.Int) (string, []byte, error) {
-	callMsg := ethereum.CallMsg{
-		From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
-		Value: amount, Data: []byte{},
-	}
-	gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
+	gasLimit, err := this.estimateGasLimit(to, to, amount, gasPrice)
 	if err != nil {
-		return "", nil, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
+		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
 	return this.newTx(to, amount, gasLimit, gasPrice, []byte{})
 }

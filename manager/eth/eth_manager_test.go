@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"fmt"
+	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/stretchr/testify/assert"
 	"time"
@@ -79,4 +80,38 @@ func TestEthManager_GetTxTime(t *testing.T) {
 	}
 	assert.NotEqual(t, ti, 0)
 	fmt.Println("ti:", ti)
+}
+
+func TestEthManager_EstimateFee(t *testing.T) {
+	eth := &config.Eth{
+		KeyStore: "./testdata2/wallets/eth",
+		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
+		RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+	}
+	tp := &common.TransferParam{
+		Id:      1,
+		Address: "0x95FB49AE2DEC0D2a37b27033742fd99915faF6A1",
+		Amount:  "100",
+	}
+	tps := make([]*common.TransferParam, 0)
+	tps = append(tps, tp)
+	eatp := &common.ExcelParam{
+		BillList:        tps,
+		TokenType:       config.ETH,
+		ContractAddress: "",
+		EventType:       "sss",
+		Admin:           "",
+		EstimateFee:     "",
+		Sum:             "",
+		AdminBalance:    "",
+	}
+	manager, err := NewEthManager(eth, eatp)
+	if err != nil {
+		fmt.Println("NewEthManager:", err)
+	}
+	fee, err := manager.EstimateFee()
+	if err != nil {
+		fmt.Println("EstimateFee:", err)
+	}
+	fmt.Println("fee:", fee)
 }

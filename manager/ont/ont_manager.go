@@ -101,6 +101,7 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) InertSql() {
 
 }
+
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
@@ -190,6 +191,49 @@ func (self *OntManager) SetContractAddress(address string) error {
 	}
 	self.precision = int(res.Int64())
 	return nil
+}
+
+func (self *OntManager) NewBatchWithdrawTx(addrAndAmts [][]string) (string, []byte, error) {
+	var sts []ont.State
+	for _, addrAndAmt := range addrAndAmts {
+		to, err := common.AddressFromBase58(addrAndAmt[0])
+		if err != nil {
+			return "", nil, fmt.Errorf("AddressFromBase58 error: %s", err)
+		}
+		var val *big.Int
+		if self.eatp.TokenType == config.ONT {
+			val = utils.ToIntByPrecise(addrAndAmt[1], config.ONT_DECIMALS)
+		} else if self.eatp.TokenType == config.ONG {
+			val = utils.ToIntByPrecise(addrAndAmt[1], config.ONG_DECIMALS)
+		} else {
+			log.Errorf("token type not support, tokenType: %s", self.eatp.TokenType)
+			return "", nil, fmt.Errorf("not supprt token type: %s", self.eatp.TokenType)
+		}
+		st := ont.State{
+			From:  self.account.Address,
+			To:    to,
+			Value: val.Uint64(),
+		}
+		sts = append(sts, st)
+	}
+	params := ont.Transfers{
+		States: sts,
+	}
+	tx, err := self.ontSdk.Native.NewNativeInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit,
+		OntIDVersion, sdk.ONG_CONTRACT_ADDRESS, "transfer", []interface{}{params})
+	if err != nil {
+		return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.Native.NewNativeInvokeTransaction error: %s", err)
+	}
+	err = self.ontSdk.SignToTransaction(tx, self.account)
+	if err != nil {
+		return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
+	}
+	t, err := tx.IntoImmutable()
+	if err != nil {
+		return "", nil, fmt.Errorf("IntoImmutable error: %s", err)
+	}
+	h := tx.Hash()
+	return h.ToHexString(), t.ToArray(), nil
 }
 
 func (self *OntManager) NewWithdrawTx(destAddr string, amount string) (string, []byte, error) {

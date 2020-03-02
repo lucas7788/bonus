@@ -80,13 +80,6 @@ func Transfer(ctx *routing.Context) error {
 	if mgr.GetStatus() == common.Transfering {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
-	//sum, _ := mgr.ComputeSum()
-	//sumF, _ := strconv.ParseFloat(sum, 64)
-	//balance, _ := mgr.GetAdminBalance()
-	////balanceF, _ := strconv.ParseFloat(balance, 64)
-	//if balanceF < sumF {
-	//	return writeResponse(ctx, ResponsePack(BalanceIsNotEnough))
-	//}
 	mgr.StartTransfer()
 	log.Info("start transfer success")
 	return writeResponse(ctx, ResponsePack(SUCCESS))

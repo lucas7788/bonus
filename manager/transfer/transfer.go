@@ -45,11 +45,6 @@ func (self *TxHandleTask) WaitClose() {
 }
 
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		log.Error("StartHandleTransferTask recover info: ", r)
-	//	}
-	//}()
 	for {
 		select {
 		case param, ok := <-self.TransferQueue:

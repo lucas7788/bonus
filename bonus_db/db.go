@@ -100,38 +100,42 @@ func InsertSql(args *common.ExcelParam) error {
 	if err != nil {
 		return err
 	}
-	for _, bill := range args.BillList {
-		id, err := QueryId(args.EventType, bill.Address)
-		if err != nil || id == 0 {
-			log.Errorf("QueryId error: %s", err)
-			return err
-		}
-		bill.Id = id
+	err = UpdateId(args)
+	if err != nil {
+		log.Errorf("UpdateId error: %s, eventType: %s", err, args.EventType)
+		return err
 	}
 	return nil
 }
 
-func QueryId(eventType string, address string) (int, error) {
-	strSql := "select Id from bonus_transaction_info where EventType=? and Address= ?"
+func UpdateId(args *common.ExcelParam) error {
+	strSql := "select Id,Address,Amount from bonus_transaction_info where EventType=?"
 	stmt, err := DefDB.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
 	}
 	if err != nil {
-		return 0, err
+		return err
 	}
-	rows, err := stmt.Query(eventType, address)
+	rows, err := stmt.Query(args.EventType)
 	if rows != nil {
 		defer rows.Close()
 	}
+	tps := make([]*common.TransferParam, 0)
 	for rows.Next() {
 		var id int
-		if err = rows.Scan(&id); err != nil {
-			return 0, err
+		var addr, amount string
+		if err = rows.Scan(&id, &addr, &amount); err != nil {
+			return err
 		}
-		return id, nil
+		tps = append(tps, &common.TransferParam{
+			Id:      id,
+			Address: addr,
+			Amount:  amount,
+		})
 	}
-	return 0, nil
+	args.BillList = tps
+	return nil
 }
 
 func UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, address string, id int) error {

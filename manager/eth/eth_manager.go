@@ -145,6 +145,7 @@ func (self *EthManager) EstimateFee() (string, error) {
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
+
 	gaslimit, err := self.estimateGasLimit(contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
 	if err != nil {
 		return "", err
@@ -295,8 +296,9 @@ func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amoun
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
 		}
+		to := ethComm.HexToAddress("0xd46e8dd67c5d32be8058bb8eb970870f07244567")
 		callMsg := ethereum.CallMsg{
-			From: this.account.Address, To: &contractAddr, Gas: 0, GasPrice: gasPrice,
+			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
 			Value: big.NewInt(0), Data: txData,
 		}
 		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)

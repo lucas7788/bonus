@@ -28,6 +28,4 @@ const (
 	SleepTime         = 3
 	EthRetryLimit     = 6
 	EthSleepTime      = 6
-	RequestCounterMax = 100000000
-	RequestInfoSlot   = 10000
 )

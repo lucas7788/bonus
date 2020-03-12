@@ -19,6 +19,7 @@ type TxHandleTask struct {
 	waitVerify         chan bool
 	rwLock             *sync.RWMutex
 	TransferStatus     common.TransferStatus
+	TokenType          string
 }
 
 type VerifyParam struct {
@@ -28,7 +29,7 @@ type VerifyParam struct {
 	Address   string
 }
 
-func NewTxHandleTask() *TxHandleTask {
+func NewTxHandleTask(tokenType string) *TxHandleTask {
 	transferQueue := make(chan *common.TransferParam, config.TRANSFER_QUEUE_SIZE)
 	verifyQueue := make(chan *VerifyParam, config.VERIFY_TX_QUEUE_SIZE)
 	return &TxHandleTask{
@@ -37,6 +38,7 @@ func NewTxHandleTask() *TxHandleTask {
 		TransferStatus: common.Transfering,
 		closeChan:      make(chan bool),
 		waitVerify:     make(chan bool),
+		TokenType:      tokenType,
 	}
 }
 
@@ -134,6 +136,9 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
 					continue
 				} else {
+                    if self.TokenType == config.ERC20 {
+                    	time.Sleep(config.EthSleepTime *time.Second)
+					}
 					break
 				}
 			}

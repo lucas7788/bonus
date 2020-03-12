@@ -231,7 +231,7 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 
 func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
-	self.txHandleTask = transfer.NewTxHandleTask()
+	self.txHandleTask = transfer.NewTxHandleTask(self.eatp.TokenType)
 	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
@@ -305,6 +305,7 @@ func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amoun
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
+		gasLimit = gasLimit * 10
 		return gasLimit, nil
 	}
 }

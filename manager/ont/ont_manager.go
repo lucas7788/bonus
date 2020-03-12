@@ -98,10 +98,6 @@ func (self *OntManager) VerifyAddress(address string) bool {
 	return true
 }
 
-func (self *OntManager) InertSql() {
-
-}
-
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
@@ -125,7 +121,7 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 }
 
 func (self *OntManager) StartHandleTxTask() {
-	txHandleTask := transfer.NewTxHandleTask()
+	txHandleTask := transfer.NewTxHandleTask(self.eatp.TokenType)
 	self.txHandleTask = txHandleTask
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
 	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)

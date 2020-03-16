@@ -7,10 +7,12 @@ import (
 var Version = ""
 
 var DefConfig = &Config{
-	RestPort: DEFAULT_REST_PORT,
+	RestPort:    DEFAULT_REST_PORT,
+	LevelDBPath: "./leveldb",
 }
 
 type Config struct {
+	LevelDBPath        string
 	RestPort           uint   `json:"rest_port"`
 	Version            string `json:"version"`
 	HttpMaxConnections int    `json:"http_max_connections"`

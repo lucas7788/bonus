@@ -47,6 +47,11 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("initConfig error: %s", err)
 		return
 	}
+	restful.DefAllEventType, err = bonus_db.InitAllEventType()
+	if err != nil {
+		log.Errorf("InitLevelDB error: %s", err)
+		return
+	}
 	err = initDB(ctx)
 	if err != nil {
 		log.Errorf("initDB error: %s", err)

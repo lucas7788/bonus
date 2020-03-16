@@ -13,14 +13,13 @@ import (
 	"os"
 )
 
-
 type AllEventType struct {
 	EvtTypes []string
 	db       *leveldb.DB
 }
 
 func (this *AllEventType) IsContains(evtType string) bool {
-	for _,item := range this.EvtTypes {
+	for _, item := range this.EvtTypes {
 		if item == evtType {
 			return true
 		}
@@ -38,7 +37,7 @@ func (this *AllEventType) AddEvtType(evtType string) error {
 func InitAllEventType() (*AllEventType, error) {
 	db, err := InitLevelDB(config.EventType)
 	if err != nil {
-		return nil ,err
+		return nil, err
 	}
 	val, err := db.Get([]byte(config.EventType), nil)
 	if err != nil {

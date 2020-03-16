@@ -12,8 +12,8 @@ type WithdrawManager interface {
 	GetAdminAddress() string
 	EstimateFee() (string, error)
 	GetTxTime(txHash string) (uint32, error)
-	GetAdminBalance() (string, error)
-	WithdrawToken(address string) error
+	GetAdminBalance() (map[string]string, error)
+	WithdrawToken() error
 	ComputeSum() (string, error)
 	GetStatus() common.TransferStatus
 	VerifyAddress(address string) bool

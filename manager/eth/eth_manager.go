@@ -124,19 +124,21 @@ func (self *EthManager) GetAdminAddress() string {
 	return self.account.Address.Hex()
 }
 
-func (self *EthManager) GetAdminBalance() (string, error) {
+func (self *EthManager) GetAdminBalance() (map[string]string, error) {
+	res := make(map[string]string)
 	if self.eatp.TokenType == config.ERC20 {
 		erc20, ok := self.tokens[self.eatp.ContractAddress]
 		if !ok {
-			return "", fmt.Errorf("Withdraw: token %s not exist", self.eatp.ContractAddress)
+			return nil, fmt.Errorf("Withdraw: token %s not exist", self.eatp.ContractAddress)
 		}
 		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
 		if err != nil {
-			return "", fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.eatp.ContractAddress, err)
+			return nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.eatp.ContractAddress, err)
 		}
-		return utils.ToStringByPrecise(balance, erc20.Decimals), nil
+		res[self.eatp.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
+
 	}
-	return "", fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+	return res, fmt.Errorf("not support token type: %s", self.eatp.TokenType)
 }
 
 func (self *EthManager) EstimateFee() (string, error) {
@@ -168,13 +170,23 @@ func (self *EthManager) ComputeSum() (string, error) {
 	return "", fmt.Errorf("not supported token type: %s", self.eatp.TokenType)
 }
 
-func (self *EthManager) WithdrawToken(address string) error {
+func (this *EthManager) GetFromAddress() {
+
+	this.getFromAddress()
+}
+
+func (this *EthManager) getFromAddress() {
+
+}
+
+func (self *EthManager) WithdrawToken() error {
 	if self.eatp.TokenType == config.ERC20 {
 		ba, err := self.GetAdminBalance()
+		fmt.Println(ba)
 		if err != nil {
 			return err
 		}
-		hash, txHex, err := self.NewWithdrawTx(address, ba)
+		hash, txHex, err := self.NewWithdrawTx("", "")
 		if hash == "" || txHex == nil || err != nil {
 			return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
 		}
@@ -305,10 +317,13 @@ func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amoun
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
+		log.Info("gasLimit:", gasLimit)
 		gasLimit = gasLimit * 10
+		log.Info("gasLimit:", gasLimit)
 		return gasLimit, nil
 	}
 }
+
 
 func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (string, []byte, error) {
 	txData, err := this.Erc20Abi.Pack("transfer", to, amount)

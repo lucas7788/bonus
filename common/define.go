@@ -1,8 +1,8 @@
 package common
 
 import (
-	"io"
 	"github.com/ontio/ontology/common"
+	"io"
 )
 
 type TransferParam struct {
@@ -133,9 +133,9 @@ func ParseExcelParamToBonusInfo(param *ExcelParam) *BonusInfo {
 		TokenType:       param.TokenType,
 		ContractAddress: param.ContractAddress,
 		TxInfos:         txInfos,
-		Admin:param.Admin,
-		EstimateFee:param.EstimateFee,
-		Sum:param.Sum,
+		Admin:           param.Admin,
+		EstimateFee:     param.EstimateFee,
+		Sum:             param.Sum,
 		AdminBalance:    param.AdminBalance,
 	}
 }

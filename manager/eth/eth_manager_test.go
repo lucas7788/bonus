@@ -86,7 +86,8 @@ func TestEthManager_EstimateFee(t *testing.T) {
 	eth := &config.Eth{
 		KeyStore: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
-		RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		//RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddr:"http://onto-eth.ont.io:10331",
 	}
 	tp := &common.TransferParam{
 		Id:      1,
@@ -97,13 +98,13 @@ func TestEthManager_EstimateFee(t *testing.T) {
 	tps = append(tps, tp)
 	eatp := &common.ExcelParam{
 		BillList:        tps,
-		TokenType:       config.ETH,
-		ContractAddress: "",
+		TokenType:       config.ERC20,
+		ContractAddress: "0xdac17f958d2ee523a2206206994597c13d831ec7",
 		EventType:       "sss",
 		Admin:           "",
 		EstimateFee:     "",
 		Sum:             "",
-		AdminBalance:    "",
+		AdminBalance:    nil,
 	}
 	manager, err := NewEthManager(eth, eatp)
 	if err != nil {

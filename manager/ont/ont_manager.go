@@ -1,6 +1,7 @@
 package ont
 
 import (
+	"encoding/json"
 	"fmt"
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
@@ -12,16 +13,15 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
+	"io/ioutil"
 	"math/big"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
 )
 
 var OntIDVersion = byte(0)
-
-var ontRpcIpAddress = []string{"http://dappnode1.ont.io:20336", "http://dappnode2.ont.io:20336",
-	"http://dappnode3.ont.io:20336"}
 
 type OntManager struct {
 	account             *sdk.Account
@@ -32,6 +32,48 @@ type OntManager struct {
 	precision           int
 	txHandleTask        *transfer.TxHandleTask
 	eatp                *common2.ExcelParam
+}
+
+func (this *OntManager) GetFromAddress() {
+	var pageNumber *int
+	this.getFromAddress(pageNumber)
+}
+
+func (this *OntManager) getFromAddress(pageNumber *int) (string, error) {
+	*pageNumber += 1
+	url := fmt.Sprintf("http://explorer.ont.io/v2/addresses/%s/transactions?page_size=10&page_number=%d", "ASLbwuar3ZTbUbLPnCgjGUw2WHhMfvJJtx", *pageNumber)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	res := make(map[string]interface{})
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("response Body:", res)
+	result := res["result"].([]interface{})
+	for _, item := range result {
+		rr := item.(map[string]interface{})
+		transfers := rr["transfers"].([]interface{})
+		for _, tr := range transfers {
+			tfs := tr.(map[string]interface{})
+			if tfs["to_address"] == this.account.Address.ToBase58() {
+				return tfs["from_address"].(string), nil
+			}
+		}
+	}
+	return this.getFromAddress(pageNumber)
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam) (*OntManager, error) {
@@ -128,13 +170,23 @@ func (self *OntManager) StartHandleTxTask() {
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 
-func (self *OntManager) WithdrawToken(address string) error {
+func (self *OntManager) WithdrawToken() error {
 	bal, err := self.GetAdminBalance()
 	if err != nil {
 		return fmt.Errorf("GetAdminBalance faied, error: %s", err)
 	}
+	for tokenType, amt := range bal {
+		if amt == "" {
+			continue
+		}
+		self.withdrawToken(tokenType, amt)
+	}
+	return nil
+}
+
+func (self *OntManager) withdrawToken(tokenType, bal string) error {
 	var amt string
-	if self.eatp.TokenType == config.ONT {
+	if tokenType == config.ONT {
 		amt = bal
 	} else if self.eatp.TokenType == config.ONG {
 		value := utils.ParseAssetAmount(bal, config.ONG_DECIMALS)
@@ -151,7 +203,7 @@ func (self *OntManager) WithdrawToken(address string) error {
 	} else {
 		return fmt.Errorf("not support token type: %s", self.eatp.TokenType)
 	}
-	_, txHex, err := self.NewWithdrawTx(address, amt)
+	_, txHex, err := self.NewWithdrawTx("", amt)
 	if err != nil {
 		log.Errorf("NewWithdrawTx failed, error: %s", err)
 		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
@@ -305,33 +357,33 @@ func (self *OntManager) GetAdminAddress() string {
 	return self.account.Address.ToBase58()
 }
 
-func (self *OntManager) GetAdminBalance() (string, error) {
-	var ba string
-	if self.eatp.TokenType == config.ONT {
-		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
-		if err != nil {
-			return "", err
-		}
-		ba = strconv.FormatUint(val, 10)
-	} else if self.eatp.TokenType == config.ONG {
-		val, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
-		if err != nil {
-			return "", err
-		}
-		r := new(big.Int)
-		r.SetUint64(val)
-		ba = utils.ToStringByPrecise(r, 9)
-	} else if self.eatp.TokenType == config.OEP4 {
+func (self *OntManager) GetAdminBalance() (map[string]string, error) {
+	val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+	if err != nil {
+		return nil, err
+	}
+	ontBa := strconv.FormatUint(val, 10)
+	val, err = self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
+	if err != nil {
+		return nil, err
+	}
+	r := new(big.Int)
+	r.SetUint64(val)
+	ongBa := utils.ToStringByPrecise(r, 9)
+
+	res := make(map[string]string)
+	res["Ont"] = ontBa
+	res["Ong"] = ongBa
+	if self.eatp.TokenType == config.OEP4 {
 		oep4 := oep4.NewOep4(self.oep4ContractAddress, self.ontSdk)
 		val, err := oep4.BalanceOf(self.account.Address)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		ba = utils.ToStringByPrecise(val, uint64(self.precision))
-	} else {
-		return "", fmt.Errorf("token type should be ONT or ONG")
+		ba := utils.ToStringByPrecise(val, uint64(self.precision))
+		res[self.eatp.TokenType] = ba
 	}
-	return ba, nil
+	return res, nil
 }
 
 func (self *OntManager) EstimateFee() (string, error) {
@@ -396,10 +448,6 @@ func (self *OntManager) SendTx(txHex []byte) (string, error) {
 		return "", fmt.Errorf("SendTransaction error: %s", err)
 	}
 	return txHash.ToHexString(), nil
-}
-func (self *OntManager) changeIpAddress() {
-	index := (self.ipIndex + 1) % len(ontRpcIpAddress)
-	self.ontSdk.NewRpcClient().SetAddress(ontRpcIpAddress[index])
 }
 
 func (self *OntManager) VerifyTx(txHash string) bool {

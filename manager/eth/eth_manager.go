@@ -162,19 +162,17 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 }
 
 func (self *EthManager) EstimateFee(tokenType string, total int) (string, error) {
-
 	contractAddr := ethComm.HexToAddress(self.eatp.ContractAddress)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
-
 	gaslimit, err := self.estimateGasLimit(config.ETH, contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
 	if err != nil {
 		return "", err
 	}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
-	gas := gasLimi.Mul(gasLimi, DEFAULT_GAS_PRICE)
-	gasTotal := gas.Mul(gas, new(big.Int).SetUint64(uint64(total)))
+	gas := new(big.Int).Mul(gasLimi, DEFAULT_GAS_PRICE)
+	gasTotal := new(big.Int).Mul(gas, new(big.Int).SetUint64(uint64(total)))
 	return utils.ToStringByPrecise(gasTotal, config.ETH_DECIMALS), nil
 }
 
@@ -214,7 +212,7 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		amtBig := new(big.Int).Sub(baBig, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)
 	}
-	log.Errorf("amt: %s", amt)
+	log.Errorf("amt: %s, tokenType:%s", amt, tokenType)
 	hash, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
 	if hash == "" || txHex == nil || err != nil {
 		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
@@ -244,16 +242,16 @@ func (this *EthManager) SetContractAddress(address string) error {
 	return nil
 }
 
-func (self *EthManager) AppendParam(param *common2.TransferParam) {
-	self.txHandleTask.TransferQueue <- param
-}
-
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		if err != nil {
+			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
+			return
+		}
 		for _, trParam := range self.eatp.BillList {
-			if trParam.Amount == "0" {
+			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
 			self.txHandleTask.TransferQueue <- trParam
@@ -284,7 +282,6 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	} else {
 		return "", nil, fmt.Errorf("Withdraw: dest addr is invaild")
 	}
-
 	ethBalance, err := this.ethClient.PendingBalanceAt(context.Background(), this.account.Address)
 	if err != nil {
 		return "", nil, fmt.Errorf("Withdraw: cannot get eth pending balance, err: %s", err)
@@ -293,7 +290,7 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
 			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
 	}
-	if this.eatp.TokenType == config.ETH {
+	if (this.eatp.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
 		withdrawAmount := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
 		if ethBalance.Cmp(withdrawAmount) < 0 {
 			return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
@@ -331,7 +328,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
 		}
-		return gasLimit, nil
+		return gasLimit * 2, nil
 	} else {
 		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 		if err != nil {
@@ -346,10 +343,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
-		log.Info("gasLimit:", gasLimit)
-		gasLimit = gasLimit * 10
-		log.Info("gasLimit:", gasLimit)
-		return gasLimit, nil
+		return gasLimit * 2, nil
 	}
 }
 
@@ -362,6 +356,9 @@ func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amo
 	if err != nil {
 		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
+	gasL := new(big.Int).SetUint64(gasLimit)
+	fee := new(big.Int).Mul(gasL, DEFAULT_GAS_PRICE)
+	log.Infof("fee:%s", utils.ToStringByPrecise(fee, config.ETH_DECIMALS))
 	return this.newTx(contractAddr, big.NewInt(0), gasLimit, gasPrice, txData)
 }
 

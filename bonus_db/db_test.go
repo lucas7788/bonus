@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func init()  {
+
+}
 func TestInsertSql(t *testing.T) {
 	db, err := NewBonusDB()
 	if err != nil {
@@ -30,7 +33,7 @@ func TestInsertSql(t *testing.T) {
 		BillList:        tps,
 		TokenType:       "11",
 		ContractAddress: "111",
-		EventType:       "111",
+		EventType:       "evtType",
 		Admin:           "111",
 		EstimateFee:     "111",
 		Sum:             "string",
@@ -41,6 +44,10 @@ func TestInsertSql(t *testing.T) {
 	evts, err := db.QueryAllEventType()
 	assert.Nil(t, err)
 	fmt.Println(evts)
+
+	param, err := db.QueryExcelParamByEventType("evtType",0,2)
+	assert.Nil(t, err)
+	fmt.Println(param)
 }
 
 func TestBonusDB_InsertTxInfoSql(t *testing.T) {
@@ -59,4 +66,8 @@ func TestBonusDB_InsertTxInfoSql(t *testing.T) {
 	info, err := db.QueryTxHexByExcelAndAddr("11", "11", 1)
 	assert.Nil(t, err)
 	fmt.Println(info)
+}
+
+func TestBonusDB_QueryExcelParamByEventType(t *testing.T) {
+
 }

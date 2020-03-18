@@ -21,7 +21,7 @@ type TransactionInfo struct {
 	ErrorDetail     string
 }
 
-type GetDataByEventType struct {
+type GetTxInfoByEvtType struct {
 	TxInfo          []*TransactionInfo
 	Admin           string
 	EstimateFee     string
@@ -30,6 +30,7 @@ type GetDataByEventType struct {
 	EventType       string
 	TokenType       string
 	ContractAddress string
+	NetType         string
 }
 
 type TransferStatus byte
@@ -61,6 +62,7 @@ type ExcelParam struct {
 	Sum             string
 	AdminBalance    map[string]string
 	NetType         string
+	Total           int
 }
 
 type WithdrawParam struct {

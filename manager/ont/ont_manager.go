@@ -21,19 +21,18 @@ import (
 var OntIDVersion = byte(0)
 
 type OntManager struct {
-	account             *sdk.Account
-	ontSdk              *sdk.OntologySdk
-	oep4ContractAddress common.Address
-	cfg                 *config.Ont
-	ipIndex             int
-	precision           int
-	txHandleTask        *transfer.TxHandleTask
-	eatp                *common2.ExcelParam
-	netType             string
+	account         *sdk.Account
+	ontSdk          *sdk.OntologySdk
+	contractAddress common.Address
+	cfg             *config.Ont
+	ipIndex         int
+	precision       int
+	txHandleTask    *transfer.TxHandleTask
+	eatp            *common2.ExcelParam
+	netType         string
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
-
 	var rpcAddr string
 	if netType == config.MainNet {
 		rpcAddr = cfg.OntJsonRpcAddressMainNet
@@ -165,7 +164,7 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 }
 
 func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
-	log.Errorf("address:%s, amt:%s", address, amt)
+	log.Infof("address:%s, amt:%s", address, amt)
 	_, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
 	if err != nil {
 		log.Errorf("NewWithdrawTx failed, error: %s", err)
@@ -189,7 +188,10 @@ func (self *OntManager) SetContractAddress(address string) error {
 	if err != nil {
 		return err
 	}
-	self.oep4ContractAddress = addr
+	self.contractAddress = addr
+	if self.eatp.TokenType == config.OEP5 {
+		return nil
+	}
 	//update precision
 	preResult, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(addr,
 		[]interface{}{"decimals", []interface{}{}})
@@ -253,7 +255,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		return "", nil, fmt.Errorf("common.AddressFromBase58 error: %s", err)
 	}
 	var tx *types.MutableTransaction
-	if self.eatp.TokenType == config.ONT || tokenType == config.ONT {
+	if (self.eatp.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -273,7 +275,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
-	} else if self.eatp.TokenType == config.ONG || tokenType == config.ONG {
+	} else if (self.eatp.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -293,13 +295,13 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
 		}
-	} else {
-		if self.oep4ContractAddress == common.ADDRESS_EMPTY {
-			return "", nil, fmt.Errorf("oep4ContractAddress is nil")
+	} else if (self.eatp.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
+		if self.contractAddress == common.ADDRESS_EMPTY {
+			return "", nil, fmt.Errorf("contractAddress is nil")
 		}
 		val := utils.ParseAssetAmount(amount, self.precision)
 		value := new(big.Int).SetUint64(val)
-		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.oep4ContractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, value}})
+		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, value}})
 		if err != nil {
 			return "", nil, fmt.Errorf("NewNeoVMInvokeTransaction error: %s", err)
 		}
@@ -307,6 +309,21 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
 		}
+	} else if (self.eatp.TokenType == config.OEP5 && tokenType == "") || tokenType == config.OEP5 {
+		if self.contractAddress == common.ADDRESS_EMPTY {
+			return "", nil, fmt.Errorf("contractAddress is nil")
+		}
+		tokenId := ""
+		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{address, tokenId}})
+		if err != nil {
+			return "", nil, fmt.Errorf("NewNeoVMInvokeTransaction error: %s", err)
+		}
+		err = self.ontSdk.SignToTransaction(tx, self.account)
+		if err != nil {
+			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
+		}
+	} else {
+		return "", nil, fmt.Errorf("[NewWithdrawTx] not supprt self.eatp.TokenType: %s,token Type: %s", self.eatp.TokenType, tokenType)
 	}
 	t, err := tx.IntoImmutable()
 	if err != nil {
@@ -333,12 +350,11 @@ func (self *OntManager) GetAdminBalance() (map[string]string, error) {
 	r := new(big.Int)
 	r.SetUint64(val)
 	ongBa := utils.ToStringByPrecise(r, 9)
-
 	res := make(map[string]string)
 	res[config.ONT] = ontBa
 	res[config.ONG] = ongBa
 	if self.eatp.TokenType == config.OEP4 {
-		oep4 := oep4.NewOep4(self.oep4ContractAddress, self.ontSdk)
+		oep4 := oep4.NewOep4(self.contractAddress, self.ontSdk)
 		val, err := oep4.BalanceOf(self.account.Address)
 		if err != nil {
 			return nil, err
@@ -445,7 +461,7 @@ func (self *OntManager) VerifyTx(txHash string, retryLimit int) bool {
 			return false
 		}
 		if event.State == 1 {
-			if self.oep4ContractAddress != common.ADDRESS_EMPTY {
+			if self.contractAddress != common.ADDRESS_EMPTY {
 				if len(event.Notify) == 2 {
 					return true
 				} else {

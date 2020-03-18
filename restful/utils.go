@@ -7,39 +7,64 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
 	"strings"
+	"strconv"
 )
 
-func ParseQueryDataParam(ctx *routing.Context) (netTy string, evtTys []string, errCode int64) {
-	param, errCode := parse(ctx)
-	if errCode != SUCCESS {
-		return "", nil, errCode
-	}
-	netType, ok := param["netType"]
-	if !ok {
-		return "", nil, PARA_ERROR
-	}
-	netTy, ok = netType.(string)
-	if !ok {
-		return "", nil, PARA_ERROR
-	}
+type QueryTxInfoParam struct {
+	NetTy    string
+	EvtTy    string
+	PageSize int
+	PageNum  int
+}
 
-	arg, ok := param["eventType"]
-	if !ok {
-		return "", nil, PARA_ERROR
+func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
+
+	netType := ctx.Param("netty")
+	evtty := ctx.Param("evtty")
+	pageSize := ctx.Param("pagesize")
+    pageSi,err := strconv.Atoi(pageSize)
+    if err != nil {
+    	return nil, PARA_ERROR
 	}
-	pa, ok := arg.([]interface{})
-	if !ok {
-		return "", nil, PARA_ERROR
+	pageNum := ctx.Param("pagenum")
+	pageNu,err := strconv.Atoi(pageNum)
+	if err != nil {
+		return nil, PARA_ERROR
 	}
-	res := make([]string, 0)
-	for _, item := range pa {
-		it, ok := item.(string)
-		if !ok {
-			return "", nil, TypeTransferError
-		}
-		res = append(res, it)
+	return &QueryTxInfoParam{
+		NetTy:    netType,
+		EvtTy:    evtty,
+		PageSize: int(pageSi),
+		PageNum:  int(pageNu),
+	}, SUCCESS
+}
+
+type QueryExcelParam struct {
+	EvtType  string
+	PageNum  int
+	PageSize int
+	NetType  string
+}
+
+func ParseQueryExcelParam(ctx *routing.Context) (*QueryExcelParam, int64) {
+	evtty := ctx.Param("evtty")
+	netty := ctx.Param("netty")
+	pageNumStr := ctx.Param("pagenum")
+	pageNum,err := strconv.Atoi(pageNumStr)
+	if err != nil {
+		return nil, PARA_ERROR
 	}
-	return netTy, res, SUCCESS
+	pageSizeStr := ctx.Param("pagesize")
+	pageSize,err := strconv.Atoi(pageSizeStr)
+	if err != nil {
+		return nil, PARA_ERROR
+	}
+	return &QueryExcelParam{
+		EvtType:  evtty,
+		PageNum:  int(pageNum),
+		PageSize: int(pageSize),
+		NetType:  netty,
+	}, SUCCESS
 }
 
 func ParseTransferParam(ctx *routing.Context) (evtType string, netType string, errCode int64) {
@@ -111,20 +136,28 @@ func ParseWithdrawParam(ctx *routing.Context) (*common.WithdrawParam, int64) {
 	}, SUCCESS
 }
 
-func ParseSetGasPriceParam(ctx *routing.Context) (float64, int64) {
+func ParseSetGasPriceParam(ctx *routing.Context) (float64, string, int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {
-		return 0, PARA_ERROR
+		return 0, "", PARA_ERROR
+	}
+	tokenType, ok := param["tokenType"]
+	if !ok {
+		return 0, "", PARA_ERROR
+	}
+	tokenTy, ok := tokenType.(string)
+	if !ok {
+		return 0, "", PARA_ERROR
 	}
 	gasPrice, ok := param["gasPrice"]
 	if !ok {
-		return 0, PARA_ERROR
+		return 0, "", PARA_ERROR
 	}
 	gasPri, ok := gasPrice.(float64)
 	if !ok {
-		return 0, PARA_ERROR
+		return 0, "", PARA_ERROR
 	}
-	return gasPri, SUCCESS
+	return gasPri, tokenTy, SUCCESS
 }
 
 func parse(ctx *routing.Context) (map[string]interface{}, int64) {

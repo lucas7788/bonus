@@ -33,20 +33,20 @@ func InitManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawMa
 func createManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
 
 	switch eatp.TokenType {
-	case config.ONG, config.OEP4, config.ONT:
+	case config.ONG, config.OEP4, config.ONT, config.OEP5:
 		//init ont manager
 		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
 		return ontManager, nil
-	case config.ERC20:
+	case config.ERC20, config.ETH:
 		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
 		return ethManager, nil
 	default:
-		return nil, fmt.Errorf("no support token, tokenType: %s", eatp.TokenType)
+		return nil, fmt.Errorf("[createManager] no support token, tokenType: %s", eatp.TokenType)
 	}
 }

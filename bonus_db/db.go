@@ -46,7 +46,7 @@ func NewBonusDB() (*BonusDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	createExcelTableSql := `CREATE TABLE IF NOT EXISTS "excel_info"("Id" INTEGER PRIMARY KEY autoincrement NOT NULL, "TokenType" varchar(20) not null, "EventType" varchar(100) not null,"NetType" varchar(15) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null)`
+	createExcelTableSql := `CREATE TABLE IF NOT EXISTS "excel_info"("Id" INTEGER PRIMARY KEY autoincrement NOT NULL, "TokenType" varchar(20) not null, "EventType" varchar(100) not null,"ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null)`
 	_, err = db.Exec(createExcelTableSql, nil)
 	if err != nil {
 		return nil, err
@@ -88,18 +88,46 @@ func (this *BonusDB) QueryAllEventType() ([]string, error) {
 	}
 	return res, nil
 }
+func (this *BonusDB) QueryTxInfoEventType(netTy string) ([]string, error) {
+	strSql := "select EventType from bonus_transaction_info where NetType = ?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query(netTy)
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	res := make([]string, 0)
+	for rows.Next() {
+		var eventType string
+		if err = rows.Scan(&eventType); err != nil {
+			return nil, err
+		}
+		if !common.IsHave(res, eventType) {
+			res = append(res, eventType)
+		}
+	}
+	return res, nil
+}
 
 func (this *BonusDB) InsertExcelSql(args *common.ExcelParam) error {
 	sqlStrArr := make([]string, 0)
 	for _, bill := range args.BillList {
-		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s', '%s')", args.NetType, args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
+		oneData := fmt.Sprintf("('%s','%s','%s','%s', '%s')", args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
 	if len(sqlStrArr) == 0 {
 		return fmt.Errorf("database has the same data")
 	}
 	content := strings.Join(sqlStrArr, ",")
-	strSql := "insert into excel_info (NetType,EventType,TokenType,ContractAddress, Address, Amount) values"
+	strSql := "insert into excel_info (EventType,TokenType,ContractAddress, Address, Amount) values"
 	_, err := this.db.Exec(strSql + content)
 	if err != nil {
 		return err
@@ -217,7 +245,7 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[strin
 }
 
 func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
-	strSql := "select sum(Id) from bonus_transaction_info where EventType=? and netType=? and TxResult=?"
+	strSql := "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -225,7 +253,7 @@ func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult)
 	if err != nil {
 		return 0, err
 	}
-	rows, err := stmt.Query(eventType, netType, common.TxSuccess)
+	rows, err := stmt.Query(eventType, netType, txResult)
 	if rows != nil {
 		defer rows.Close()
 	}
@@ -273,8 +301,14 @@ func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int)
 	return nil, nil
 }
 
-func (this *BonusDB) QueryExcelParamByEventType(evtType, netType string) (*common.ExcelParam, error) {
-	strSql := "select Id, TokenType,ContractAddress,Address,Amount from excel_info where EventType = ? and NetType=?"
+// start == 0 && end == 0 mean query all data
+func (this *BonusDB) QueryExcelParamByEventType(evtType string, start, end int) (*common.ExcelParam, error) {
+	var strSql string
+	if start == 0 && end ==0 {
+		strSql = "select Id, TokenType,ContractAddress,Address,Amount from excel_info where EventType = ?"
+	} else {
+		strSql = "select Id, TokenType,ContractAddress,Address,Amount from excel_info where EventType = ? order by id DESC limit ?, ?"
+	}
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -282,7 +316,12 @@ func (this *BonusDB) QueryExcelParamByEventType(evtType, netType string) (*commo
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query(evtType, netType)
+	var rows *sql.Rows
+	if start == end {
+		rows, err = stmt.Query(evtType)
+	} else {
+		rows, err = stmt.Query(evtType, start, end)
+	}
 	if rows != nil {
 		defer rows.Close()
 	}
@@ -316,8 +355,13 @@ func (this *BonusDB) QueryExcelParamByEventType(evtType, netType string) (*commo
 	}, nil
 }
 
-func (this *BonusDB) QueryTxInfoByEventType(eventType string) ([]*common.TransactionInfo, error) {
-	strSql := "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
+func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int) ([]*common.TransactionInfo, error) {
+	var strSql string
+	if start == 0 && end ==0 {
+		strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
+	} else {
+		strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? order by id DESC limit ?, ?"
+	}
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -325,7 +369,12 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string) ([]*common.Transac
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query(eventType)
+	var rows *sql.Rows
+	if start==0 && end ==0 {
+		rows, err = stmt.Query(eventType)
+	} else {
+		rows, err = stmt.Query(eventType, start, end)
+	}
 	if rows != nil {
 		defer rows.Close()
 	}

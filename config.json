@@ -1,10 +1,6 @@
 {
   "rest_port":8080,
   "version":"1.0.0",
-  "bonusdb_url":"127.0.0.1:3306",
-  "bonusdb_name":"bonus",
-  "bonusdb_user":"root",
-  "bonusdb_password":"111111",
   "ont_cfg": {
     "rpc_addr_test_net":"http://polaris1.ont.io:20336",
     "rpc_addr_main_net":"http://polaris1.ont.io:20336",

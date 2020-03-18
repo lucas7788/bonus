@@ -61,8 +61,6 @@ func initDB(ctx *cli.Context) error {
 	var err error
 	bonus_db.DefBonusDB, err = bonus_db.NewBonusDB()
 	if err != nil {
-		log.Errorf("username: %s, password: %s", config.DefConfig.BonusDBUser,
-			config.DefConfig.BonusDBPassword)
 		return fmt.Errorf("ConnectDB error: %s", err)
 	}
 	return nil

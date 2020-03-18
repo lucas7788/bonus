@@ -16,6 +16,7 @@ var DefBonusDB *BonusDB
 type BonusDB struct {
 	db *sql.DB
 }
+
 func NewBonusDB() (*BonusDB, error) {
 	dbFileName := "./db/" + "bonus" + ".db"
 	if !common2.FileExisted("./db") {
@@ -91,7 +92,7 @@ func (this *BonusDB) QueryAllEventType() ([]string, error) {
 func (this *BonusDB) InsertExcelSql(args *common.ExcelParam) error {
 	sqlStrArr := make([]string, 0)
 	for _, bill := range args.BillList {
-		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s', '%s')",args.NetType, args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
+		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s', '%s')", args.NetType, args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
 	if len(sqlStrArr) == 0 {
@@ -111,11 +112,10 @@ func (this *BonusDB) InsertExcelSql(args *common.ExcelParam) error {
 	return nil
 }
 
-
 func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
 	sqlStrArr := make([]string, 0)
 	for _, txInfo := range args {
-		oneData := fmt.Sprintf("('%d','%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.Id,txInfo.NetType,txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex,txInfo.TxResult,txInfo.ErrorDetail)
+		oneData := fmt.Sprintf("('%d','%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.Id, txInfo.NetType, txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex, txInfo.TxResult, txInfo.ErrorDetail)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
 	if len(sqlStrArr) == 0 {
@@ -186,24 +186,24 @@ func (this *BonusDB) UpdateTxResult(eventType, address string, id int, txResult 
 	return err
 }
 
-func (this *BonusDB) QueryTransferProgress(eventType, netType string)(map[string]int, error) {
-	success,err := this.getSum(eventType,netType,common.TxSuccess)
+func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[string]int, error) {
+	success, err := this.getSum(eventType, netType, common.TxSuccess)
 	if err != nil {
 		return nil, err
 	}
-	failed,err := this.getSum(eventType,netType,common.TxFailed)
+	failed, err := this.getSum(eventType, netType, common.TxFailed)
 	if err != nil {
 		return nil, err
 	}
-	transfering,err := this.getSum(eventType,netType,common.OneTransfering)
+	transfering, err := this.getSum(eventType, netType, common.OneTransfering)
 	if err != nil {
 		return nil, err
 	}
-	notSend,err := this.getSum(eventType,netType,common.NotSend)
+	notSend, err := this.getSum(eventType, netType, common.NotSend)
 	if err != nil {
 		return nil, err
 	}
-	sendFailed,err := this.getSum(eventType,netType,common.SendFailed)
+	sendFailed, err := this.getSum(eventType, netType, common.SendFailed)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string)(map[string
 	return res, nil
 }
 
-func (this *BonusDB) getSum(eventType, netType string,txResult common.TxResult) (int, error) {
+func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
 	strSql := "select sum(Id) from bonus_transaction_info where EventType=? and netType=? and TxResult=?"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
@@ -235,11 +235,11 @@ func (this *BonusDB) getSum(eventType, netType string,txResult common.TxResult) 
 	for rows.Next() {
 		var sum int
 		if err = rows.Scan(&sum); err != nil {
-			return 0,err
+			return 0, err
 		}
 		return sum, nil
 	}
-	return 0,nil
+	return 0, nil
 }
 
 func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {
@@ -332,7 +332,7 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string) ([]*common.Transac
 	if err != nil {
 		return nil, err
 	}
-	res :=make([]*common.TransactionInfo, 0)
+	res := make([]*common.TransactionInfo, 0)
 	for rows.Next() {
 		var txHash, tokenType, contractAddress, address, amount, errorDetail string
 		var txResult byte

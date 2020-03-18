@@ -4,9 +4,8 @@ const (
 	ONT_DECIMALS = 0
 	ONG_DECIMALS = 9
 	ETH_DECIMALS = 18
-
-	PASSWORD  = "ABCDEFGH"
-	EventType = "EventType"
+	PASSWORD     = "ABCDEFGH"
+	EventType    = "EventType"
 )
 
 const (

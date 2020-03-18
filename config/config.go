@@ -54,9 +54,9 @@ type Ont struct {
 }
 
 type Eth struct {
-	KeyStore string `json:"key_store"`
-	RpcAddrTestNet  string `json:"rpc_addr_test_net"`
-	RpcAddrMainNet  string `json:"rpc_addr_main_net"`
+	KeyStore       string `json:"key_store"`
+	RpcAddrTestNet string `json:"rpc_addr_test_net"`
+	RpcAddrMainNet string `json:"rpc_addr_main_net"`
 }
 type EthToken struct {
 	TokenName    string `json:"token_name"`

@@ -42,7 +42,6 @@ func ParseQueryDataParam(ctx *routing.Context) (netTy string, evtTys []string, e
 	return netTy, res, SUCCESS
 }
 
-
 func ParseTransferParam(ctx *routing.Context) (evtType string, netType string, errCode int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {

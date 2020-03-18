@@ -10,8 +10,8 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
 	"math/big"
-	"sync"
 	"strings"
+	"sync"
 )
 
 var DefBonusMap *sync.Map //projectId -> Airdrop
@@ -21,7 +21,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	evtTypes,err := bonus_db.DefBonusDB.QueryAllEventType()
+	evtTypes, err := bonus_db.DefBonusDB.QueryAllEventType()
 	if err != nil {
 		log.Errorf("QueryAllEventType error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
@@ -63,11 +63,11 @@ func UpLoadExcel(ctx *routing.Context) error {
 func GetAdminBalanceByEventType(ctx *routing.Context) error {
 	evtType := ctx.Param("eventtype")
 	netType := ctx.Param("nettype")
-	mgr,errCode := parseMgr(evtType, netType)
+	mgr, errCode := parseMgr(evtType, netType)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	adminBalance,err := mgr.GetAdminBalance()
+	adminBalance, err := mgr.GetAdminBalance()
 	if err != nil {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))

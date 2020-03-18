@@ -52,7 +52,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 			continue
 		}
 		if tx == nil {
-			hash, txhex, err := mana.NewWithdrawTx(trParam.Address, trParam.Amount,"")
+			hash, txhex, err := mana.NewWithdrawTx(trParam.Address, trParam.Amount, "")
 			var txInfo *common.TransactionInfo
 			if err != nil {
 				log.Errorf("NewWithdrawTx error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)

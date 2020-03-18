@@ -5,15 +5,15 @@ import (
 )
 
 const (
-	POST_EXECL              = "/api/v1/uploadexecl"
-	POST_TRANSFER           = "/api/v1/transfer"
-	POST_DATA_BY_EVENT_TYPE = "/api/v1/getdatabyeventtype"
-	POST_WITHDRAW           = "/api/v1/withdraw"
-	POST_SET_GAS_PRICE      = "/api/v1/setgasprice"
-	GET_ALL_EVENT_TYPE      = "/api/v1/getalleventtype/<nettype>"
-	GET_GAS_PRICE           = "/api/v1/getgasprice"
-	Get_Excel_Param         = "/api/v1/getexcelparam"
-	Get_Tansfer_Progress    = "/api/v1/gettransferprogress"
+	POST_EXECL                      = "/api/v1/uploadexecl"
+	POST_TRANSFER                   = "/api/v1/transfer"
+	POST_DATA_BY_EVENT_TYPE         = "/api/v1/getdatabyeventtype"
+	POST_WITHDRAW                   = "/api/v1/withdraw"
+	POST_SET_GAS_PRICE              = "/api/v1/setgasprice"
+	GET_ALL_EVENT_TYPE              = "/api/v1/getalleventtype/<nettype>"
+	GET_GAS_PRICE                   = "/api/v1/getgasprice"
+	Get_Excel_Param                 = "/api/v1/getexcelparam"
+	Get_Tansfer_Progress            = "/api/v1/gettransferprogress"
 	GET_ADMIN_BALANCE_BY_EVENT_TYPE = "/api/v1/getadminbalancebyeventtype/<eventtype>/<nettype>"
 )
 

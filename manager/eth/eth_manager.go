@@ -444,31 +444,37 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 
 func (this *EthManager) VerifyTx(txHash string, retryLimit int) bool {
 	hash := common.HexToHash(txHash)
-	retry := 0
 	for {
-		receipt, err := this.ethClient.TransactionReceipt(context.Background(), hash)
-		if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-			return true
+		_, isPending, err := this.ethClient.TransactionByHash(context.Background(), hash)
+		if err == ethereum.NotFound {
+			log.Errorf("[VerifyTx] TransactionByHash error: %s, txHash:%s", err, txHash)
+			return false
 		}
-
-		if err != nil && retry < config.EthRetryLimit {
-			retry += 1
-			time.Sleep(time.Duration(retry*config.EthSleepTime) * time.Second)
+		if err != nil || isPending {
+			log.Errorf("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
+			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
 			continue
 		}
-
-		if err != nil && retry >= config.EthRetryLimit {
-			log.Errorf("retry: %d,TransactionReceipt error: %s", retry, err)
+		receipt, err := this.ethClient.TransactionReceipt(context.Background(), hash)
+		if err == ethereum.NotFound {
+			log.Errorf("[VerifyTx]TransactionReceipt error: %s", err)
 			return false
+		}
+		if err != nil {
+			log.Errorf("[VerifyTx]TransactionReceipt error: %s", err)
+			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
+			continue
 		}
 		if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
 			return true
 		} else {
-			bs, err := receipt.MarshalJSON()
-			if err != nil {
-				log.Errorf("MarshalJSON error: %s", err)
-			} else {
-				log.Errorf("verify tx failed, err: %s", string(bs))
+			if receipt != nil {
+				bs, err := receipt.MarshalJSON()
+				if err != nil {
+					log.Errorf("[VerifyTx]MarshalJSON error: %s", err)
+				} else {
+					log.Errorf("[VerifyTx]verify tx failed, err: %s", string(bs))
+				}
 			}
 			return false
 		}

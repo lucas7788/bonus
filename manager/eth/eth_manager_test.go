@@ -41,6 +41,9 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 	fmt.Println(manager.GetAdminBalance())
 	err = manager.WithdrawToken("0x4e7946D1Ee8f8703E24C6F3fBf032AD4459c4648", config.ETH)
 	assert.Nil(t, err)
+}
+
+func TestEthManager_EstimateFee2(t *testing.T) {
 
 }
 
@@ -121,8 +124,8 @@ func TestEthManager_EstimateFee(t *testing.T) {
 	eth := &config.Eth{
 		KeyStore: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
-		//RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-		RpcAddrTestNet: "http://onto-eth.ont.io:10331",
+		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 	}
 	tp := &common.TransferParam{
 		Id:      1,

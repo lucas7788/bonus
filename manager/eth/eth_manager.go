@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000001", config.ETH_DECIMALS) // 10 Gwei
+	OneGwei           = new(big.Int).SetUint64(uint64(1000000000))
+	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", config.ETH_DECIMALS) // 40 Gwei
 	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", config.ETH_DECIMALS)
 )
 
@@ -51,18 +52,27 @@ type EthManager struct {
 	cfg          *config.Eth
 	lock         sync.RWMutex
 	eatp         *common2.ExcelParam
+	netType      string
 }
 
-func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam) (*EthManager, error) {
-	if cfg.RpcAddr == "" {
+func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
+	var rpcAddr string
+	if netType == config.MainNet {
+		rpcAddr = cfg.RpcAddrMainNet
+	} else if netType == config.TestNet {
+		rpcAddr = cfg.RpcAddrTestNet
+	} else {
+		return nil, fmt.Errorf("[NewEthManager] not support net type: %s", netType)
+	}
+	if rpcAddr == "" {
 		return nil, fmt.Errorf("RpcAddr config error")
 	}
 
-	ethClient, err := ethclient.Dial(cfg.RpcAddr)
+	ethClient, err := ethclient.Dial(rpcAddr)
 	if err != nil {
 		return nil, fmt.Errorf("NewEthManager: connect to node failed, %s", err)
 	}
-	c, err := rpc.DialContext(context.Background(), cfg.RpcAddr)
+	c, err := rpc.DialContext(context.Background(), rpcAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +105,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam) (*EthManager, erro
 		cfg:          cfg,
 		txTimeClient: c,
 		eatp:         eatp,
+		netType:      netType,
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -109,6 +120,10 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam) (*EthManager, erro
 		return nil, fmt.Errorf("NewEthManager: parse erc20 abi failed, %s", err)
 	}
 	return mgr, nil
+}
+
+func (self *EthManager) GetNetType() string {
+	return self.netType
 }
 
 func (self *EthManager) VerifyAddress(address string) bool {
@@ -138,24 +153,33 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 		res[self.eatp.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
 
 	}
-	return res, fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+	ethBalance, err := self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
+	if err != nil {
+		return nil, fmt.Errorf("[GetAdminBalance] Withdraw: cannot get eth pending balance, err: %s", err)
+	}
+	res[config.ETH] = utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS)
+	return res, nil
 }
 
-func (self *EthManager) EstimateFee() (string, error) {
+func (self *EthManager) EstimateFee(tokenType string, total int) (string, error) {
 
 	contractAddr := ethComm.HexToAddress(self.eatp.ContractAddress)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
 
-	gaslimit, err := self.estimateGasLimit(contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
+	gaslimit, err := self.estimateGasLimit(config.ETH, contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
 	if err != nil {
 		return "", err
 	}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
 	gas := gasLimi.Mul(gasLimi, DEFAULT_GAS_PRICE)
-	gasTotal := gas.Mul(gas, new(big.Int).SetUint64(uint64(len(self.eatp.BillList))))
+	gasTotal := gas.Mul(gas, new(big.Int).SetUint64(uint64(total)))
 	return utils.ToStringByPrecise(gasTotal, config.ETH_DECIMALS), nil
+}
+
+func (this *EthManager) GetTotal() int {
+	return len(this.eatp.BillList)
 }
 
 func (self *EthManager) ComputeSum() (string, error) {
@@ -170,34 +194,38 @@ func (self *EthManager) ComputeSum() (string, error) {
 	return "", fmt.Errorf("not supported token type: %s", self.eatp.TokenType)
 }
 
-func (this *EthManager) GetFromAddress() {
-
-	this.getFromAddress()
-}
-
-func (this *EthManager) getFromAddress() {
-
-}
-
-func (self *EthManager) WithdrawToken() error {
-	if self.eatp.TokenType == config.ERC20 {
-		ba, err := self.GetAdminBalance()
-		fmt.Println(ba)
+func (self *EthManager) WithdrawToken(address, tokenType string) error {
+	ba, err := self.GetAdminBalance()
+	if err != nil {
+		return err
+	}
+	var amt string
+	if tokenType == config.ERC20 {
+		amt = ba[config.ERC20]
+	} else if tokenType == config.ETH {
+		ba := ba[config.ETH]
+		baBig := utils.ToIntByPrecise(ba, config.ETH_DECIMALS)
+		feeStr, err := self.EstimateFee(config.ETH, 1)
 		if err != nil {
 			return err
 		}
-		hash, txHex, err := self.NewWithdrawTx("", "")
-		if hash == "" || txHex == nil || err != nil {
-			return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
-		}
-		hash, err = self.SendTx(txHex)
-		if err != nil {
-			return fmt.Errorf("send tx failed, error:%s", err)
-		}
-		boo := self.VerifyTx(hash)
-		if !boo {
-			return fmt.Errorf("verify tx failed")
-		}
+		log.Errorf("fee: %s", feeStr)
+		fee := utils.ToIntByPrecise(feeStr, config.ETH_DECIMALS)
+		amtBig := new(big.Int).Sub(baBig, fee)
+		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)
+	}
+	log.Errorf("amt: %s", amt)
+	hash, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
+	if hash == "" || txHex == nil || err != nil {
+		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
+	}
+	hash, err = self.SendTx(txHex)
+	if err != nil {
+		return fmt.Errorf("send tx failed, error:%s", err)
+	}
+	boo := self.VerifyTx(hash, config.RetryLimit)
+	if !boo {
+		return fmt.Errorf("verify tx failed")
 	}
 	return nil
 }
@@ -223,6 +251,7 @@ func (self *EthManager) AppendParam(param *common2.TransferParam) {
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
+		self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
 		for _, trParam := range self.eatp.BillList {
 			if trParam.Amount == "0" {
 				continue
@@ -248,7 +277,7 @@ func (self *EthManager) StartHandleTxTask() {
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 
-func (this *EthManager) NewWithdrawTx(destAddr string, amount string) (string, []byte, error) {
+func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {
 	to := ethComm.Address{}
 	if ethComm.IsHexAddress(destAddr) {
 		to = ethComm.HexToAddress(destAddr)
@@ -292,8 +321,8 @@ func (this *EthManager) NewWithdrawTx(destAddr string, amount string) (string, [
 	}
 }
 
-func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (uint64, error) {
-	if this.eatp.TokenType == config.ETH {
+func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (uint64, error) {
+	if this.eatp.TokenType == config.ETH || tokenType == config.ETH {
 		callMsg := ethereum.CallMsg{
 			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
 			Value: amount, Data: []byte{},
@@ -324,13 +353,12 @@ func (this *EthManager) estimateGasLimit(contractAddr, to ethComm.Address, amoun
 	}
 }
 
-
 func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (string, []byte, error) {
 	txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 	if err != nil {
 		return "", nil, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
 	}
-	gasLimit, err := this.estimateGasLimit(contractAddr, to, amount, gasPrice)
+	gasLimit, err := this.estimateGasLimit(config.ERC20, contractAddr, to, amount, gasPrice)
 	if err != nil {
 		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
@@ -338,7 +366,7 @@ func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amo
 }
 
 func (this *EthManager) newWithdrawEthTx(to ethComm.Address, amount *big.Int, gasPrice *big.Int) (string, []byte, error) {
-	gasLimit, err := this.estimateGasLimit(to, to, amount, gasPrice)
+	gasLimit, err := this.estimateGasLimit(config.ETH, to, to, amount, gasPrice)
 	if err != nil {
 		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
@@ -417,7 +445,7 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 	return tx.Hash().String(), nil
 }
 
-func (this *EthManager) VerifyTx(txHash string) bool {
+func (this *EthManager) VerifyTx(txHash string, retryLimit int) bool {
 	hash := common.HexToHash(txHash)
 	retry := 0
 	for {

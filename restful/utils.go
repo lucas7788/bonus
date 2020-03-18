@@ -9,67 +9,123 @@ import (
 	"strings"
 )
 
-func ParseQueryDataParam(ctx *routing.Context) ([]string, int64) {
+func ParseQueryDataParam(ctx *routing.Context) (netTy string, evtTys []string, errCode int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {
-		return nil, errCode
+		return "", nil, errCode
 	}
+	netType, ok := param["netType"]
+	if !ok {
+		return "", nil, PARA_ERROR
+	}
+	netTy, ok = netType.(string)
+	if !ok {
+		return "", nil, PARA_ERROR
+	}
+
 	arg, ok := param["eventType"]
 	if !ok {
-		return nil, PARA_ERROR
+		return "", nil, PARA_ERROR
 	}
 	pa, ok := arg.([]interface{})
 	if !ok {
-		return nil, PARA_ERROR
+		return "", nil, PARA_ERROR
 	}
 	res := make([]string, 0)
 	for _, item := range pa {
 		it, ok := item.(string)
 		if !ok {
-			return nil, TypeTransferError
+			return "", nil, TypeTransferError
 		}
 		res = append(res, it)
 	}
-	return res, SUCCESS
+	return netTy, res, SUCCESS
 }
 
-func ParseTransferParam(ctx *routing.Context) (string, int64) {
-	param, errCode := parse(ctx)
-	if errCode != SUCCESS {
-		return "", errCode
-	}
-	args, ok := param["eventType"]
-	if !ok {
-		return "", PARA_ERROR
-	}
-	pa, ok := args.(string)
-	if !ok {
-		return "", PARA_ERROR
-	}
-	return pa, SUCCESS
-}
-func ParseWithdrawParam(ctx *routing.Context) (string, string, int64) {
+
+func ParseTransferParam(ctx *routing.Context) (evtType string, netType string, errCode int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {
 		return "", "", errCode
 	}
-	eventType, ok := param["eventType"]
+	arg, ok := param["eventType"]
 	if !ok {
 		return "", "", PARA_ERROR
+	}
+	evtType, ok = arg.(string)
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	arg, ok = param["netType"]
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	netType, ok = arg.(string)
+	if !ok {
+		return "", "", PARA_ERROR
+	}
+	return evtType, netType, SUCCESS
+}
+
+func ParseWithdrawParam(ctx *routing.Context) (*common.WithdrawParam, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return nil, errCode
+	}
+	eventType, ok := param["eventType"]
+	if !ok {
+		return nil, PARA_ERROR
 	}
 	evtType, ok := eventType.(string)
 	if !ok {
-		return "", "", PARA_ERROR
+		return nil, PARA_ERROR
 	}
 	address, ok := param["address"]
 	if !ok {
-		return "", "", PARA_ERROR
+		return nil, PARA_ERROR
 	}
 	addr, ok := address.(string)
 	if !ok {
-		return "", "", PARA_ERROR
+		return nil, PARA_ERROR
 	}
-	return evtType, addr, SUCCESS
+	tokenType, ok := param["tokenType"]
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	tokenTy, ok := tokenType.(string)
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	netType, ok := param["netType"]
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	netTy, ok := netType.(string)
+	if !ok {
+		return nil, PARA_ERROR
+	}
+	return &common.WithdrawParam{
+		EventType: evtType,
+		Address:   addr,
+		TokenType: tokenTy,
+		NetType:   netTy,
+	}, SUCCESS
+}
+
+func ParseSetGasPriceParam(ctx *routing.Context) (float64, int64) {
+	param, errCode := parse(ctx)
+	if errCode != SUCCESS {
+		return 0, PARA_ERROR
+	}
+	gasPrice, ok := param["gasPrice"]
+	if !ok {
+		return 0, PARA_ERROR
+	}
+	gasPri, ok := gasPrice.(float64)
+	if !ok {
+		return 0, PARA_ERROR
+	}
+	return gasPri, SUCCESS
 }
 
 func parse(ctx *routing.Context) (map[string]interface{}, int64) {
@@ -98,7 +154,11 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 	if errCode != SUCCESS {
 		return nil, errCode
 	}
-
+	netType, ok := param["netType"].(string)
+	if !ok || netType == "" {
+		log.Errorf("tokenType error\n")
+		return nil, PARA_ERROR
+	}
 	tokenType, ok := param["tokenType"].(string)
 	if !ok || tokenType == "" {
 		log.Errorf("tokenType error\n")
@@ -171,6 +231,7 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 		TokenType:       tokenType,
 		ContractAddress: contractAddress,
 		EventType:       eventType,
+		NetType:         netType,
 	}, SUCCESS
 }
 

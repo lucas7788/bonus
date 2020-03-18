@@ -10,6 +10,11 @@ const (
 )
 
 const (
+	TestNet = "testnet"
+	MainNet = "mainnet"
+)
+
+const (
 	ONT   = "ONT"
 	ONG   = "ONG"
 	OEP4  = "OEP4"

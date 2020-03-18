@@ -30,8 +30,8 @@ func SetOntologyConfig(ctx *cli.Context) error {
 	if port != 0 {
 		config.DefConfig.RestPort = port
 	}
-	if config.DefConfig.OntCfg.OntJsonRpcAddress == "" ||
-		config.DefConfig.EthCfg.RpcAddr == "" {
+	if config.DefConfig.OntCfg.OntJsonRpcAddressTestNet == "" || config.DefConfig.OntCfg.OntJsonRpcAddressMainNet == "" ||
+		config.DefConfig.EthCfg.RpcAddrTestNet == "" || config.DefConfig.EthCfg.RpcAddrMainNet == "" {
 		return fmt.Errorf("OntJsonRpcAddress and RpcAddr is nil")
 	}
 	return nil

@@ -46,15 +46,17 @@ var (
 )
 
 type Ont struct {
-	OntJsonRpcAddress string `json:"ont_json_rpc_address"`
-	GasPrice          uint64 `json:"gas_price"`
-	GasLimit          uint64 `json:"gas_limit"`
-	WalletFile        string `json:"wallet_file"`
+	OntJsonRpcAddressTestNet string `json:"rpc_addr_test_net"`
+	OntJsonRpcAddressMainNet string `json:"rpc_addr_main_net"`
+	GasPrice                 uint64 `json:"gas_price"`
+	GasLimit                 uint64 `json:"gas_limit"`
+	WalletFile               string `json:"wallet_file"`
 }
 
 type Eth struct {
 	KeyStore string `json:"key_store"`
-	RpcAddr  string `json:"rpc_addr"`
+	RpcAddrTestNet  string `json:"rpc_addr_test_net"`
+	RpcAddrMainNet  string `json:"rpc_addr_main_net"`
 }
 type EthToken struct {
 	TokenName    string `json:"token_name"`

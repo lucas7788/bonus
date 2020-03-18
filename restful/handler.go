@@ -5,10 +5,13 @@ import (
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/manager"
+	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
+	"math/big"
 	"sync"
+	"strings"
 )
 
 var DefBonusMap *sync.Map //projectId -> Airdrop
@@ -17,6 +20,15 @@ func UpLoadExcel(ctx *routing.Context) error {
 	arg, errCode := ParseExcelParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	evtTypes,err := bonus_db.DefBonusDB.QueryAllEventType()
+	if err != nil {
+		log.Errorf("QueryAllEventType error: %s", err)
+		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
+	}
+	if common.IsHave(evtTypes, arg.EventType) {
+		log.Errorf("DuplicateEventType: %s", arg.EventType)
+		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
 	hasInit := false
 	var mgr interfaces.WithdrawManager
@@ -29,50 +41,66 @@ func UpLoadExcel(ctx *routing.Context) error {
 			hasInit = true
 		}
 	}
-	var err error
 	if !hasInit {
-		mgr, err = manager.InitManager(arg)
+		mgr, err = manager.InitManager(arg, arg.NetType)
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
 			return writeResponse(ctx, ResponsePack(InitManagerError))
 		}
-		DefBonusMap.Store(arg.EventType, mgr)
+		DefBonusMap.Store(arg.EventType+arg.NetType, mgr)
 	}
-	arg.Sum, err = mgr.ComputeSum()
+	updateExcelParam(mgr, arg)
+	err = bonus_db.DefBonusDB.InsertExcelSql(arg)
 	if err != nil {
-		log.Errorf("ComputeSum error: %s", err)
-		res := ResponsePack(SumError)
-		res["Result"] = err.Error()
-		return writeResponse(ctx, res)
-	}
-	arg.AdminBalance, err = mgr.GetAdminBalance()
-	if err != nil {
-		log.Errorf("GetAdminBalance error: %s", err)
-		return writeResponse(ctx, ResponsePack(InitManagerError))
-	}
-	arg.EstimateFee, err = mgr.EstimateFee()
-	if err != nil {
-		log.Errorf("EstimateFee error, err: %s", err)
-		return writeResponse(ctx, ResponsePack(EstimateFeeError))
-	}
-	err = bonus_db.InsertSql(arg)
-	if err != nil {
-		log.Errorf("InsertSql error: %s", err)
+		log.Errorf("InsertExcelSql error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
-
-	arg.Admin = mgr.GetAdminAddress()
 	res := ResponsePack(SUCCESS)
 	res["Result"] = arg
 	return writeResponse(ctx, res)
 }
 
-func Transfer(ctx *routing.Context) error {
-	eventType, errCode := ParseTransferParam(ctx)
+func GetAdminBalanceByEventType(ctx *routing.Context) error {
+	evtType := ctx.Param("eventtype")
+	netType := ctx.Param("nettype")
+	mgr,errCode := parseMgr(evtType, netType)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	mgr, errCode := parseMgr(eventType)
+	adminBalance,err := mgr.GetAdminBalance()
+	if err != nil {
+		log.Errorf("GetAdminBalance error: %s", err)
+		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
+	}
+	res := ResponsePack(SUCCESS)
+	res["Result"] = adminBalance
+	return writeResponse(ctx, res)
+}
+
+func GetGasPrice(ctx *routing.Context) error {
+	gasPrice := new(big.Int).Div(eth.DEFAULT_GAS_PRICE, eth.OneGwei)
+	res := ResponsePack(SUCCESS)
+	res["Result"] = gasPrice.Uint64()
+	return writeResponse(ctx, res)
+}
+
+func SetGasPrice(ctx *routing.Context) error {
+	gasPriceInt, errCode := ParseSetGasPriceParam(ctx)
+	if errCode != SUCCESS {
+		log.Errorf("ParseSetGasPriceParam error ")
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	gasPrice := new(big.Int).SetUint64(uint64(gasPriceInt))
+	eth.DEFAULT_GAS_PRICE = new(big.Int).Mul(gasPrice, eth.OneGwei)
+	return writeResponse(ctx, ResponsePack(SUCCESS))
+}
+
+func Transfer(ctx *routing.Context) error {
+	eventType, netType, errCode := ParseTransferParam(ctx)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	mgr, errCode := parseMgr(eventType, netType)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
@@ -86,22 +114,23 @@ func Transfer(ctx *routing.Context) error {
 }
 
 func Withdraw(ctx *routing.Context) error {
-	eventType, address, errCode := ParseWithdrawParam(ctx)
-	if errCode != SUCCESS || eventType == "" || address == "" {
+	withdrawParam, errCode := ParseWithdrawParam(ctx)
+	if errCode != SUCCESS || withdrawParam.EventType == "" || withdrawParam.NetType == "" ||
+		withdrawParam.TokenType == "" || withdrawParam.Address == "" {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	mgr, errCode := parseMgr(eventType)
+	mgr, errCode := parseMgr(withdrawParam.EventType, withdrawParam.NetType)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	if mgr.VerifyAddress(address) == false {
+	if mgr.VerifyAddress(withdrawParam.Address) == false {
 		return writeResponse(ctx, ResponsePack(AddressIsWrong))
 	}
 	log.Info("transfer status:", mgr.GetStatus())
 	if mgr.GetStatus() == common.Transfering {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
-	err := mgr.WithdrawToken(address)
+	err := mgr.WithdrawToken(withdrawParam.Address, strings.ToUpper(withdrawParam.TokenType))
 	if err != nil {
 		log.Errorf("WithdrawToken failed, error: %s", err)
 		res := ResponsePack(WithdrawTokenFailed)
@@ -112,7 +141,7 @@ func Withdraw(ctx *routing.Context) error {
 }
 
 func GetAllEventType(ctx *routing.Context) error {
-	eventType, err := bonus_db.QueryAllEventType()
+	eventType, err := bonus_db.DefBonusDB.QueryAllEventType()
 	if err != nil {
 		log.Errorf("QueryAllEventTypeError error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
@@ -122,61 +151,77 @@ func GetAllEventType(ctx *routing.Context) error {
 	return writeResponse(ctx, res)
 }
 
-func GetAdminBalanceByEventType(ctx *routing.Context) error {
-	eventType := ctx.Param("eventtype")
-	mgr, errCode := parseMgr(eventType)
+func GetTransferProgress(ctx *routing.Context) error {
+	evtType, netType, errCode := ParseTransferParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	balance, err := mgr.GetAdminBalance()
+	res, err := bonus_db.DefBonusDB.QueryTransferProgress(evtType, netType)
 	if err != nil {
-		log.Errorf("GetAdminBalance error: %s", err)
-		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
+		return writeResponse(ctx, ResponsePack(QueryTransferProgressFailed))
 	}
+	mgr, errCode := parseMgr(evtType, netType)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	total := mgr.GetTotal()
+	res["total"] = total
+	r := ResponsePack(SUCCESS)
+	r["Result"] = res
+	return writeResponse(ctx, r)
+}
+
+func GetExcelParamByEvtType(ctx *routing.Context) error {
+	evtType, netType, errCode := ParseTransferParam(ctx)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	excelParam, err := bonus_db.DefBonusDB.QueryExcelParamByEventType(evtType, netType)
+	if err != nil {
+		log.Errorf("QueryExcelParamByEventType error:%s", err)
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	mgr, errCode := parseMgr(evtType, netType)
+	updateExcelParam(mgr, excelParam)
 	res := ResponsePack(SUCCESS)
-	res["Result"] = balance
+	res["Result"] = excelParam
 	return writeResponse(ctx, res)
 }
 
-func parseMgr(eventType string) (interfaces.WithdrawManager, int64) {
-	var mgr interfaces.WithdrawManager
-	mn, ok := DefBonusMap.Load(eventType)
-	//TODO
-	if !ok || mn == nil {
-		res := make([]*common.TransactionInfo, 0)
-		var err error
-		res, err = bonus_db.QueryResultByEventType(eventType, res)
-		if err != nil {
-			log.Errorf("there is no the eventType: %s", eventType)
-			return nil, NoTheEventTypeError
-		}
-		mgr, err = manager.InitManager(ParseTxInfoToEatp(res))
-		if err != nil {
-			log.Errorf("InitManager error: %s", err)
-			return nil, InitManagerError
-		}
-
-	} else {
-		mgr, ok = mn.(interfaces.WithdrawManager)
-		if !ok {
-			return nil, TypeTransferError
-		}
+func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelParam) int64 {
+	var err error
+	excelParam.Sum, err = mgr.ComputeSum()
+	if err != nil {
+		log.Errorf("InitManager error: %s", err)
+		return SumError
 	}
-	return mgr, SUCCESS
+	excelParam.AdminBalance, err = mgr.GetAdminBalance()
+	if err != nil {
+		log.Errorf("GetAdminBalance error: %s", err)
+		return GetAdminBalanceError
+	}
+	excelParam.EstimateFee, err = mgr.EstimateFee("", mgr.GetTotal())
+	if err != nil {
+		log.Errorf("EstimateFee error: %s", err)
+		return EstimateFeeError
+	}
+	excelParam.Admin = mgr.GetAdminAddress()
+	return SUCCESS
 }
 
-func GetDataByEventType(ctx *routing.Context) error {
-	eventType, errCode := ParseQueryDataParam(ctx)
+func GetTxInfoByEventType(ctx *routing.Context) error {
+	netTy, eventType, errCode := ParseQueryDataParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	txInfo := make([]*common.TransactionInfo, 0)
 	res := make([]*common.GetDataByEventType, 0)
+
 	for _, ty := range eventType {
 		var err error
-		txInfo, err = bonus_db.QueryResultByEventType(ty, txInfo)
+		txInfo, err = bonus_db.DefBonusDB.QueryTxInfoByEventType(ty)
 		if err != nil {
-			log.Errorf("QueryResultByEventType error: %s", err)
+			log.Errorf("QueryTxInfoByEventType error: %s", err)
 			return writeResponse(ctx, ResponsePack(QueryResultByEventType))
 		}
 		eatp := ParseTxInfoToEatp(txInfo)
@@ -185,7 +230,7 @@ func GetDataByEventType(ctx *routing.Context) error {
 		if ok && mn != nil {
 			mgr, _ = mn.(interfaces.WithdrawManager)
 		} else {
-			mgr, err = manager.InitManager(eatp)
+			mgr, err = manager.InitManager(eatp, netTy)
 			if err != nil {
 				log.Errorf("InitManager error: %s", err)
 				return writeResponse(ctx, ResponsePack(InitManagerError))
@@ -202,7 +247,7 @@ func GetDataByEventType(ctx *routing.Context) error {
 			log.Errorf("GetAdminBalance error: %s", err)
 			return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 		}
-		fee, err := mgr.EstimateFee()
+		fee, err := mgr.EstimateFee("", mgr.GetTotal())
 		if err != nil {
 			log.Errorf("EstimateFee error: %s", err)
 			return writeResponse(ctx, ResponsePack(EstimateFeeError))
@@ -222,6 +267,31 @@ func GetDataByEventType(ctx *routing.Context) error {
 	r := ResponsePack(SUCCESS)
 	r["Result"] = res
 	return writeResponse(ctx, r)
+}
+
+func parseMgr(eventType, netType string) (interfaces.WithdrawManager, int64) {
+	var mgr interfaces.WithdrawManager
+	mn, ok := DefBonusMap.Load(eventType + netType)
+	//TODO
+	if !ok || mn == nil {
+		res, err := bonus_db.DefBonusDB.QueryExcelParamByEventType(eventType, netType)
+		if err != nil {
+			log.Errorf("there is no the eventType: %s, err: %s", eventType, err)
+			return nil, NoTheEventTypeError
+		}
+		mgr, err = manager.InitManager(res, netType)
+		if err != nil {
+			log.Errorf("InitManager error: %s", err)
+			return nil, InitManagerError
+		}
+
+	} else {
+		mgr, ok = mn.(interfaces.WithdrawManager)
+		if !ok {
+			return nil, TypeTransferError
+		}
+	}
+	return mgr, SUCCESS
 }
 
 func writeResponse(ctx *routing.Context, res interface{}) error {

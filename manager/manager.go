@@ -10,8 +10,8 @@ import (
 	"github.com/ontio/ontology/common/log"
 )
 
-func InitManager(eatp *common.ExcelParam) (interfaces.WithdrawManager, error) {
-	manager, err := createManager(eatp)
+func InitManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
+	manager, err := createManager(eatp, netType)
 	if err != nil {
 		return nil, err
 	}
@@ -30,18 +30,18 @@ func InitManager(eatp *common.ExcelParam) (interfaces.WithdrawManager, error) {
 	return manager, nil
 }
 
-func createManager(eatp *common.ExcelParam) (interfaces.WithdrawManager, error) {
+func createManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
 
 	switch eatp.TokenType {
 	case config.ONG, config.OEP4, config.ONT:
 		//init ont manager
-		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp)
+		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
 		return ontManager, nil
 	case config.ERC20:
-		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp)
+		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}

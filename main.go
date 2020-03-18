@@ -47,11 +47,6 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("initConfig error: %s", err)
 		return
 	}
-	restful.DefAllEventType, err = bonus_db.InitAllEventType()
-	if err != nil {
-		log.Errorf("InitLevelDB error: %s", err)
-		return
-	}
 	err = initDB(ctx)
 	if err != nil {
 		log.Errorf("initDB error: %s", err)
@@ -63,11 +58,12 @@ func startBonus(ctx *cli.Context) {
 }
 
 func initDB(ctx *cli.Context) error {
-	dberr := bonus_db.ConnectDB()
-	if dberr != nil {
+	var err error
+	bonus_db.DefBonusDB, err = bonus_db.NewBonusDB()
+	if err != nil {
 		log.Errorf("username: %s, password: %s", config.DefConfig.BonusDBUser,
 			config.DefConfig.BonusDBPassword)
-		return fmt.Errorf("ConnectDB error: %s", dberr)
+		return fmt.Errorf("ConnectDB error: %s", err)
 	}
 	return nil
 }
@@ -90,6 +86,7 @@ func waitToExit() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
 		for sig := range sc {
+			bonus_db.DefBonusDB.Close()
 			log.Infof("bonus server received exit signal: %s.", sig.String())
 			close(exit)
 			break

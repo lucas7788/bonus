@@ -7,8 +7,42 @@ import (
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/stretchr/testify/assert"
+	"math/big"
 	"time"
 )
+
+func TestEthManager_NewWithdrawTx(t *testing.T) {
+
+	gwei := new(big.Int).SetUint64(uint64(1000000000))
+	fmt.Println(gwei)
+	a, _ := new(big.Int).SetString("1000000000", 10)
+	fmt.Println(a)
+
+	res := new(big.Int)
+	res = res.Div(DEFAULT_GAS_PRICE, gwei)
+	fmt.Println(res)
+	eth := &config.Eth{
+		KeyStore:       "../../wallets/eth",
+		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
+		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+	}
+
+	eatp := &common.ExcelParam{
+		BillList:  nil,
+		TokenType: config.ETH,
+		EventType: "test",
+	}
+	manager, err := NewEthManager(eth, eatp, config.TestNet)
+	if err != nil {
+		fmt.Println("NewEthManager err:", err)
+		return
+	}
+	fmt.Println(manager.account.Address.String())
+	fmt.Println(manager.GetAdminBalance())
+	err = manager.WithdrawToken("0x4e7946D1Ee8f8703E24C6F3fBf032AD4459c4648", config.ETH)
+	assert.Nil(t, err)
+
+}
 
 func TestEthManager_Withdraw(t *testing.T) {
 	//c := &config.EthToken{
@@ -18,17 +52,18 @@ func TestEthManager_Withdraw(t *testing.T) {
 	//	//ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9",
 	//	}
 	eth := &config.Eth{
-		KeyStore: "../../wallets/eth",
-		//RpcAddr:"http://onto-eth.ont.io:10331",
-		RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		KeyStore:       "../../wallets/eth",
+		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
+		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
 
-	manager, err := NewEthManager(eth, nil)
+	manager, err := NewEthManager(eth, nil, config.MainNet)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
 	}
-	txhash, txHex, err := manager.NewWithdrawTx("0x1F8aD8DDC9b248f46C34F66a28b14c3B867f02e3", "1.0")
+	return
+	txhash, txHex, err := manager.NewWithdrawTx("0x1F8aD8DDC9b248f46C34F66a28b14c3B867f02e3", "1.0", config.ETH)
 	if err != nil {
 		fmt.Println("[NewWithdrawTx] err:", err)
 		return
@@ -39,7 +74,7 @@ func TestEthManager_Withdraw(t *testing.T) {
 		return
 	}
 	fmt.Println("start verify tx:", time.Now().Second())
-	boo := manager.VerifyTx(hash)
+	boo := manager.VerifyTx(hash, 6)
 	if boo {
 		fmt.Println("tx success txhash:", txhash)
 	} else {
@@ -54,9 +89,9 @@ func TestNewEthManager(t *testing.T) {
 	eth := &config.Eth{
 		KeyStore: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
-		RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, err := NewEthManager(eth, nil)
+	manager, err := NewEthManager(eth, nil, config.TestNet)
 	assert.Nil(t, err)
 	assert.NotEqual(t, nil, manager)
 }
@@ -68,9 +103,9 @@ func TestEthManager_GetTxTime(t *testing.T) {
 	eth := &config.Eth{
 		KeyStore: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
-		RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, _ := NewEthManager(eth, nil)
+	manager, _ := NewEthManager(eth, nil, config.TestNet)
 
 	ti, err := manager.GetTxTime("0x4df8e59e05a1f89cfa70b0db8d00c70e623cccbea07b53c36bc5b5ac041ca4f8")
 	assert.Nil(t, err)
@@ -87,7 +122,7 @@ func TestEthManager_EstimateFee(t *testing.T) {
 		KeyStore: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		//RpcAddr: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-		RpcAddr:"http://onto-eth.ont.io:10331",
+		RpcAddrTestNet: "http://onto-eth.ont.io:10331",
 	}
 	tp := &common.TransferParam{
 		Id:      1,
@@ -106,11 +141,11 @@ func TestEthManager_EstimateFee(t *testing.T) {
 		Sum:             "",
 		AdminBalance:    nil,
 	}
-	manager, err := NewEthManager(eth, eatp)
+	manager, err := NewEthManager(eth, eatp, config.TestNet)
 	if err != nil {
 		fmt.Println("NewEthManager:", err)
 	}
-	fee, err := manager.EstimateFee()
+	fee, err := manager.EstimateFee("", 1)
 	if err != nil {
 		fmt.Println("EstimateFee:", err)
 	}

@@ -22,12 +22,11 @@ func UpLoadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	evtTypes, err := bonus_db.DefBonusDB.QueryAllEventType()
+	boo, err := hasEvtTy(arg.EventType)
 	if err != nil {
-		log.Errorf("QueryAllEventType error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
 	}
-	if common.IsHave(evtTypes, arg.EventType) {
+	if boo {
 		log.Errorf("DuplicateEventType: %s", arg.EventType)
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
@@ -63,6 +62,10 @@ func UpLoadExcel(ctx *routing.Context) error {
 
 func GetAdminBalanceByEventType(ctx *routing.Context) error {
 	evtType := ctx.Param("evtty")
+	boo, _ := hasEvtTy(evtType)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
 	netType := ctx.Param("netty")
 	mgr, errCode := parseMgr(evtType, netType)
 	if errCode != SUCCESS {
@@ -116,6 +119,10 @@ func Transfer(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
+	boo, _ := hasEvtTy(eventType)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
 	mgr, errCode := parseMgr(eventType, netType)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
@@ -134,6 +141,10 @@ func Withdraw(ctx *routing.Context) error {
 	if errCode != SUCCESS || withdrawParam.EventType == "" || withdrawParam.NetType == "" ||
 		withdrawParam.TokenType == "" || withdrawParam.Address == "" {
 		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	boo, _ := hasEvtTy(withdrawParam.EventType)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
 	mgr, errCode := parseMgr(withdrawParam.EventType, withdrawParam.NetType)
 	if errCode != SUCCESS {
@@ -183,6 +194,10 @@ func GetTxInfoEventType(ctx *routing.Context) error {
 
 func GetTransferProgress(ctx *routing.Context) error {
 	evtty := ctx.Param("evtty")
+	boo, _ := hasEvtTy(evtty)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
 	netty := ctx.Param("netty")
 	res, err := bonus_db.DefBonusDB.QueryTransferProgress(evtty, netty)
 	if err != nil {
@@ -204,6 +219,10 @@ func GetExcelParamByEvtType(ctx *routing.Context) error {
 	param, errCode := ParseQueryExcelParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	boo, _ := hasEvtTy(param.EvtType)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
 	var excelParam *common.ExcelParam
 	var err error
@@ -256,6 +275,10 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
+	boo, _ := hasEvtTy(param.EvtTy)
+	if !boo {
+		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
 	if param.PageNum < 1 {
 		param.PageNum = 1
 	}
@@ -300,6 +323,20 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	r := ResponsePack(SUCCESS)
 	r["Result"] = res
 	return writeResponse(ctx, r)
+}
+
+func hasEvtTy(evtTy string) (bool, error) {
+	evtys,err := bonus_db.DefBonusDB.QueryAllEventType()
+	if err != nil {
+		log.Errorf("QueryAllEventType error: %s", err)
+		return false, err
+	}
+	for _,ty := range evtys {
+		if ty == evtTy {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func parseMgr(eventType, netType string) (interfaces.WithdrawManager, int64) {

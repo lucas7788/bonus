@@ -33,8 +33,9 @@ var ErrMap = map[int64]string{
 	QueryExcelParamByEventType:  "QueryExcelParamByEventType",
 	QueryTransferProgressFailed: "QueryTransferProgressFail",
 	DuplicateEventType:          "DuplicateEventType",
-	NetTypeError:"NetTypeError",
-	NotSupportTokenType:"NotSupportTokenType",
+	NetTypeError:                "NetTypeError",
+	NotSupportTokenType:         "NotSupportTokenType",
+	NotExistenceEvtType:         "NotExistenceEvtType",
 }
 
 const (
@@ -60,6 +61,7 @@ const (
 	QueryExcelParamByEventType  = 40018
 	QueryTransferProgressFailed = 40019
 	DuplicateEventType          = 40020
-	NetTypeError = 40021
-	NotSupportTokenType = 40022
+	NetTypeError                = 40021
+	NotSupportTokenType         = 40022
+	NotExistenceEvtType         = 40023
 )

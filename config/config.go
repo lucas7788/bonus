@@ -18,12 +18,6 @@ type Config struct {
 	HttpMaxConnections int    `json:"http_max_connections"`
 	HttpCertPath       string `json:"http_cert_path"`
 	HttpKeyPath        string `json:"http_key_path"`
-	BonusDBHost        string `json:"bonusdb_host"`
-	BonusDBPort        string `json:"bonusdb_port"`
-	BonusDBUrl         string `json:"bonusdb_url"`
-	BonusDBUser        string `json:"bonusdb_user"`
-	BonusDBPassword    string `json:"bonusdb_password"`
-	BonusDBName        string `json:"bonusdb_name"`
 	OntCfg             *Ont   `json:"ont_cfg"`
 	EthCfg             *Eth   `json:"eth_cfg"`
 }

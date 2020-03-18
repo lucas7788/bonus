@@ -5,7 +5,6 @@ const (
 	ONG_DECIMALS = 9
 	ETH_DECIMALS = 18
 	PASSWORD     = "ABCDEFGH"
-	EventType    = "EventType"
 )
 
 const (

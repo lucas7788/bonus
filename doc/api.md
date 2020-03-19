@@ -430,3 +430,34 @@ http://127.0.0.1:8080/api/v1/gettxinfo/ssserc20/testnet/1/10
     "Version": "1.0.0"
 }
 ```
+
+11. Withdraw POST
+
+提取剩余资产
+
+`http://127.0.0.1:8080/api/v1/withdraw`
+
+参数
+```
+{
+	"id": 1,
+    "jsonrpc": "2.0",
+    "method": "getdatabyeventtype",
+    "params": {
+    	"eventType":"ssserc201",
+    	"netType":"testnet",
+    	"tokenType":"ERC20",
+    	"address":"0x4e7946D1Ee8f8703E24C6F3fBf032AD4459c4648"
+    }
+}
+```
+响应
+```
+{
+    "Action": "",
+    "Desc": "SUCCESS",
+    "Error": 1,
+    "Result": {},
+    "Version": "1.0.0"
+}
+```

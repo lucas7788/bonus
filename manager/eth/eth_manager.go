@@ -212,7 +212,12 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		amtBig := new(big.Int).Sub(baBig, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)
 	}
-	log.Errorf("amt: %s, tokenType:%s", amt, tokenType)
+	log.Infof("amt: %s, tokenType:%s", amt, tokenType)
+	nonce, err := self.ethClient.PendingNonceAt(context.Background(), self.account.Address)
+	if err != nil {
+		return fmt.Errorf("[WithdrawToken] fetch nonce failed, %s", err)
+	}
+	self.nonce = nonce
 	hash, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
 	if hash == "" || txHex == nil || err != nil {
 		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)

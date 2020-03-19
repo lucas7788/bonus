@@ -2,9 +2,7 @@ package common
 
 import (
 	"fmt"
-	"github.com/ontio/ontology/common/log"
 	"os"
-	"strings"
 	"path/filepath"
 )
 

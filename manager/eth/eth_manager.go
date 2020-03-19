@@ -253,11 +253,11 @@ func (this *EthManager) SetContractAddress(address string) error {
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
-		if err != nil {
-			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
-			return
-		}
+		//err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		//if err != nil {
+		//	log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
+		//	return
+		//}
 		for _, trParam := range self.eatp.BillList {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
@@ -438,6 +438,17 @@ type TxRes struct {
 }
 
 func (this *EthManager) SendTx(txHex []byte) (string, error) {
+	for {
+		nonce,err := this.ethClient.PendingNonceAt(context.Background(), this.account.Address)
+		if err != nil {
+			return "", err
+		}
+		if this.nonce - nonce >= config.EthSendTxSlot {
+			break
+		}
+		time.Sleep(config.EthSleepTime * time.Second)
+	}
+
 	tx := &types.Transaction{}
 	err := rlp.DecodeBytes(txHex, tx)
 	if err != nil {
@@ -469,7 +480,7 @@ func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 			continue
 		}
 		if isPending {
-			log.Errorf("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
+			log.Infof("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
 			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
 			continue
 		}

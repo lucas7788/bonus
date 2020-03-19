@@ -97,6 +97,7 @@ func (self *TxHandleTask) exit() {
 	<-self.waitVerify
 	log.Info("exit StartHandleTransferTask gorountine")
 }
+
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
 	for {
 		select {
@@ -189,9 +190,6 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
 					continue
 				} else {
-					if self.TokenType == config.ERC20 {
-						time.Sleep(config.EthSleepTime * time.Second)
-					}
 					break
 				}
 			}

@@ -211,7 +211,7 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 	}
 	eventType, ok := param["eventType"].(string)
 	if !ok || eventType == "" {
-		log.Errorf("transfer is nil\n")
+		log.Errorf("eventType is nil\n")
 		return nil, PARA_ERROR
 	}
 	transferParam := make([]*common.TransferParam, 0)
@@ -225,7 +225,6 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 		log.Errorf("billList error\n")
 		return nil, PARA_ERROR
 	}
-	tempAddr := make([]string, 0)
 	for _, p := range billList {
 		pi, ok := p.(map[string]interface{})
 		if !ok {
@@ -234,12 +233,8 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 		}
 		addr, ok := pi["address"].(string)
 		if !ok {
-			log.Errorf("address parse error,")
-			log.Info("address", pi["address"])
+			log.Error("address parse error", pi["address"])
 			return nil, PARA_ERROR
-		}
-		if common.IsHave(tempAddr, addr) {
-			return nil, ExcelDuplicateAddress
 		}
 		amt, ok := pi["amount"].(string)
 		if !ok {
@@ -249,7 +244,7 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 		}
 		if strings.Contains(amt, "-") {
 			log.Errorf("amount have -,")
-			log.Info("address", pi["amount"])
+			log.Info("amount", pi["amount"])
 			return nil, PARA_ERROR
 		}
 		tp := &common.TransferParam{

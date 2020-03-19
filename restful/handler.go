@@ -314,9 +314,9 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		Admin:           mgr.GetAdminAddress(),
 		Sum:             sum,
 		EstimateFee:     fee,
-		EventType:       txInfo[0].EventType,
-		TokenType:       txInfo[0].TokenType,
-		ContractAddress: txInfo[0].ContractAddress,
+		EventType:       param.EvtTy,
+		TokenType:       mgr.GetExcelParam().TokenType,
+		ContractAddress: mgr.GetExcelParam().ContractAddress,
 		NetType:         param.NetTy,
 	}
 

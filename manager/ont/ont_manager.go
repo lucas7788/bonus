@@ -98,6 +98,9 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 func (self *OntManager) GetNetType() string {
 	return self.netType
 }
+func (self *OntManager) GetExcelParam() *common2.ExcelParam {
+	return self.eatp
+}
 
 func (self *OntManager) VerifyAddress(address string) bool {
 	_, err := common.AddressFromBase58(address)

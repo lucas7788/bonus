@@ -19,4 +19,5 @@ type WithdrawManager interface {
 	VerifyAddress(address string) bool
 	GetNetType() string
 	GetTotal() int
+	GetExcelParam() *common.ExcelParam
 }

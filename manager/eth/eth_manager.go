@@ -55,6 +55,10 @@ type EthManager struct {
 	netType      string
 }
 
+func (this *EthManager) GetExcelParam() *common2.ExcelParam {
+	return this.eatp
+}
+
 func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
 	var rpcAddr string
 	if netType == config.MainNet {

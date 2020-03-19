@@ -14,16 +14,16 @@ import (
 	"fmt"
 )
 
-var DefBonusMap *sync.Map //projectId -> Airdrop
+var DefBonusMap = new(sync.Map) //projectId -> Airdrop
 
-func UpLoadExcel(ctx *routing.Context) error {
-	arg, errCode := ParseExcelParam(ctx)
+func UploadExcel(ctx *routing.Context) error {
+	excelParam, netType, errCode := ParseExcelParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	boo := ledger.DefBonusLedger.HasExcelEvtTy(arg.EventType)
 	if boo {
-		log.Errorf("DuplicateEventType: %s", arg.EventType)
+		log.Errorf("DuplicateEventType: %s", excelParam.EventType)
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
 	ledger.DefBonusLedger.AppendExcelEvtTy(arg.EventType)
@@ -45,7 +45,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 			log.Errorf("InitManager error: %s", err)
 			return writeResponse(ctx, ResponsePack(InitManagerError))
 		}
-		DefBonusMap.Store(arg.EventType+arg.NetType, mgr)
+		DefBonusMap.Store(excelParam.EventType+netType, mgr)
 	}
 	updateExcelParam(mgr, arg)
 	err = mgr.InsertExcelSql()
@@ -54,7 +54,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
 	res := ResponsePack(SUCCESS)
-	res["Result"] = arg
+	res["Result"] = excelParam
 	return writeResponse(ctx, res)
 }
 

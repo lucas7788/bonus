@@ -27,7 +27,7 @@ import (
 	"github.com/ontio/bonus/utils"
 	common3 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
-	"os"
+	"path/filepath"
 )
 
 var (
@@ -89,9 +89,9 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		return nil, err
 	}
 	if cfg.KeyStore == "" {
-		cfg.KeyStore = fmt.Sprintf("%s%s%s", config.DefaultWalletPath, string(os.PathSeparator), "eth")
+		cfg.KeyStore = filepath.Join(config.DefaultWalletPath, "eth")
 	}
-	walletPath := fmt.Sprintf("%s%s%s%s", cfg.KeyStore, string(os.PathSeparator), "eth_", eatp.EventType)
+	walletPath := filepath.Join(cfg.KeyStore, "eth_"+eatp.EventType)
 	log.Infof("eth wallet path: %s", walletPath)
 
 	keyStore := keystore.NewKeyStore(walletPath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -183,7 +183,7 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 	res := make(map[string]string)
 	if self.eatp.TokenType == config.ERC20 {
 		erc20, ok := self.tokens[self.eatp.ContractAddress]
-		if !ok {
+		if !ok || erc20 == nil {
 			return nil, fmt.Errorf("Withdraw: token %s not exist", self.eatp.ContractAddress)
 		}
 		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
@@ -205,8 +205,9 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	contractAddr := ethComm.HexToAddress(self.eatp.ContractAddress)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
+	// TODO: FIX HERE
 	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
-	gaslimit, err := self.estimateGasLimit(config.ETH, contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
+	gaslimit, err := self.estimateGasLimit(tokenType, contractAddr, adminAddress, amount, DEFAULT_GAS_PRICE)
 	if err != nil {
 		return "", err
 	}
@@ -363,7 +364,7 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 }
 
 func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethComm.Address, amount *big.Int, gasPrice *big.Int) (uint64, error) {
-	if this.eatp.TokenType == config.ETH || tokenType == config.ETH {
+	if tokenType == config.ETH {
 		callMsg := ethereum.CallMsg{
 			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
 			Value: amount, Data: []byte{},
@@ -373,7 +374,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
 		}
 		return gasLimit * 2, nil
-	} else {
+	} else if tokenType == config.ERC20 {
 		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
@@ -388,6 +389,8 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
 		return gasLimit * 2, nil
+	} else {
+		return 0, fmt.Errorf("unknown token type: %s", tokenType)
 	}
 }
 

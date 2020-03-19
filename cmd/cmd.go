@@ -32,7 +32,7 @@ func SetOntologyConfig(ctx *cli.Context) error {
 	}
 	if config.DefConfig.OntCfg.OntJsonRpcAddressTestNet == "" || config.DefConfig.OntCfg.OntJsonRpcAddressMainNet == "" ||
 		config.DefConfig.EthCfg.RpcAddrTestNet == "" || config.DefConfig.EthCfg.RpcAddrMainNet == "" {
-		return fmt.Errorf("OntJsonRpcAddress and RpcAddr is nil")
+		return fmt.Errorf("invalid RpcAddress and RpcAddr config")
 	}
 	return nil
 }

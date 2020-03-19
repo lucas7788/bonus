@@ -14,7 +14,7 @@ import (
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"math/big"
-	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -46,16 +46,16 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	}
 	ontSdk := sdk.NewOntologySdk()
 	ontSdk.NewRpcClient().SetAddress(rpcAddr)
-	if cfg.WalletFile == "" {
-		cfg.WalletFile = fmt.Sprintf("%s%s%s", config.DefaultWalletPath, string(os.PathSeparator), "ont")
+	if cfg.WalletDir == "" {
+		cfg.WalletDir = filepath.Join(config.DefaultWalletPath, "ont")
 	}
-	err := common2.CheckPath(cfg.WalletFile)
+	err := common2.CheckPath(cfg.WalletDir)
 	if err != nil {
 		return nil, err
 	}
 
 	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.EventType)
-	walletFile := fmt.Sprintf("%s%s%s", cfg.WalletFile, string(os.PathSeparator), walletName)
+	walletFile := filepath.Join(cfg.WalletDir, walletName)
 	var wallet *sdk.Wallet
 	if !common2.PathExists(walletFile) {
 		wallet, err = ontSdk.CreateWallet(walletFile)
@@ -65,16 +65,18 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	} else {
 		wallet, err = ontSdk.OpenWallet(walletFile)
 		if err != nil {
-			log.Fatalf("Can't open local wallet: %s", err)
-			return nil, fmt.Errorf("password is wrong")
+			return nil, fmt.Errorf("failed to open local wallet %s: %s", walletFile, err)
 		}
 	}
 
 	log.Infof("ont walletFile: %s", walletFile)
 	acct, err := wallet.GetDefaultAccount([]byte(config.PASSWORD))
-	if (err != nil && err.Error() == "does not set default account") || acct == nil {
+	if acct == nil {
 		acct, err = wallet.NewDefaultSettingAccount([]byte(config.PASSWORD))
 		if err != nil {
+			return nil, err
+		}
+		if err := wallet.SetDefaultAccount(acct.Address.ToBase58()); err != nil {
 			return nil, err
 		}
 		err = wallet.Save()
@@ -86,14 +88,14 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 		return nil, err
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
+	cfg2 := *cfg
 	ontManager := &OntManager{
 		account:  acct,
 		ontSdk:   ontSdk,
-		cfg:      cfg,
+		cfg:     &cfg2,
 		eatp:     eatp,
 		netType:  netType,
 		db:       db,
-		gasPrice: int(cfg.GasPrice),
 	}
 	return ontManager, nil
 }
@@ -128,7 +130,7 @@ func (self *OntManager) GetExcelParam() *common2.ExcelParam {
 func (self *OntManager) VerifyAddress(address string) bool {
 	_, err := common.AddressFromBase58(address)
 	if err != nil {
-		log.Errorf("ont VerifyAddress failed, address: %s", address)
+		log.Errorf("ont VerifyAddress failed, address: %s, %s", address, err)
 		return false
 	}
 	return true
@@ -215,9 +217,6 @@ func (self *OntManager) SetContractAddress(address string) error {
 		return err
 	}
 	self.contractAddress = addr
-	if self.eatp.TokenType == config.OEP5 {
-		return nil
-	}
 	//update precision
 	preResult, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(addr,
 		[]interface{}{"decimals", []interface{}{}})
@@ -335,19 +334,6 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
 		}
-	} else if (self.eatp.TokenType == config.OEP5 && tokenType == "") || tokenType == config.OEP5 {
-		if self.contractAddress == common.ADDRESS_EMPTY {
-			return "", nil, fmt.Errorf("contractAddress is nil")
-		}
-		tokenId := ""
-		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{address, tokenId}})
-		if err != nil {
-			return "", nil, fmt.Errorf("NewNeoVMInvokeTransaction error: %s", err)
-		}
-		err = self.ontSdk.SignToTransaction(tx, self.account)
-		if err != nil {
-			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
-		}
 	} else {
 		return "", nil, fmt.Errorf("[NewWithdrawTx] not supprt self.eatp.TokenType: %s,token Type: %s", self.eatp.TokenType, tokenType)
 	}
@@ -364,22 +350,26 @@ func (self *OntManager) GetAdminAddress() string {
 }
 
 func (self *OntManager) GetAdminBalance() (map[string]string, error) {
-	val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
-	if err != nil {
-		return nil, err
-	}
-	ontBa := strconv.FormatUint(val, 10)
-	val, err = self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
+	res := make(map[string]string)
+
+	// get ONG balance
+	val, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
 	if err != nil {
 		return nil, err
 	}
 	r := new(big.Int)
 	r.SetUint64(val)
 	ongBa := utils.ToStringByPrecise(r, 9)
-	res := make(map[string]string)
-	res[config.ONT] = ontBa
 	res[config.ONG] = ongBa
-	if self.eatp.TokenType == config.OEP4 {
+
+	if self.eatp.TokenType == config.ONT {
+		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		if err != nil {
+			return nil, err
+		}
+		ba := strconv.FormatUint(val, 10)
+		res[config.ONT] = ba
+	} else if self.eatp.TokenType == config.OEP4 {
 		oep4 := oep4.NewOep4(self.contractAddress, self.ontSdk)
 		val, err := oep4.BalanceOf(self.account.Address)
 		if err != nil {

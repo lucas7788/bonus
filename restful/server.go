@@ -22,7 +22,7 @@ const (
 //init restful server
 func InitRouter() *routing.Router {
 	router := routing.New()
-	router.Post(POST_EXECL, UpLoadExcel)
+	router.Post(POST_EXECL, UploadExcel)
 	router.Post(POST_TRANSFER, Transfer)
 	router.Post(POST_WITHDRAW, Withdraw)
 	router.Post(POST_SET_GAS_PRICE, SetGasPrice)

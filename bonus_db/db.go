@@ -118,6 +118,10 @@ func (this *BonusDB) QueryTxInfoEventType(netTy string) ([]string, error) {
 }
 
 func (this *BonusDB) InsertExcelSql(args *common.ExcelParam) error {
+	// FIXME:
+	// 1. add lock to DB
+	// 2. remove auto-incr ID in excel-info table
+	// 3. manage ID manually
 	sqlStrArr := make([]string, 0)
 	for _, bill := range args.BillList {
 		oneData := fmt.Sprintf("('%s','%s','%s','%s', '%s')", args.EventType, args.TokenType, args.ContractAddress, bill.Address, bill.Amount)

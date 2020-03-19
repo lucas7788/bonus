@@ -190,71 +190,76 @@ func parse(ctx *routing.Context) (map[string]interface{}, int64) {
 	return para, SUCCESS
 }
 
-func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
+func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, string, int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {
-		return nil, errCode
+		return nil, "", errCode
 	}
 	netType, ok := param["netType"].(string)
 	if !ok || netType == "" {
-		log.Errorf("tokenType error\n")
-		return nil, PARA_ERROR
+		log.Errorf("netType error\n")
+		return nil, "", PARA_ERROR
 	}
 	tokenType, ok := param["tokenType"].(string)
 	if !ok || tokenType == "" {
 		log.Errorf("tokenType error\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	contractAddress, ok := param["contractAddress"].(string)
 	if !ok {
 		log.Errorf("contractAddress error\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	if tokenType == config.ERC20 && contractAddress == "" {
 		log.Errorf("tokenType == config.ERC20 and contractAddress is nil\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	if tokenType == config.OEP4 && contractAddress == "" {
 		log.Errorf("param error\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	eventType, ok := param["eventType"].(string)
 	if !ok || eventType == "" {
 		log.Errorf("eventType is nil\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	transferParam := make([]*common.TransferParam, 0)
 	billListRaw, ok := param["billList"]
 	if !ok {
 		log.Errorf("param Unmarshal error\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	billList, ok := billListRaw.([]interface{})
 	if !ok {
 		log.Errorf("billList error\n")
-		return nil, PARA_ERROR
+		return nil, "", PARA_ERROR
 	}
 	for _, p := range billList {
 		pi, ok := p.(map[string]interface{})
 		if !ok {
 			log.Errorf("p error\n")
-			return nil, PARA_ERROR
+			return nil, "", PARA_ERROR
 		}
 		addr, ok := pi["address"].(string)
 		if !ok {
 			log.Error("address parse error", pi["address"])
-			return nil, PARA_ERROR
+			return nil, "", PARA_ERROR
 		}
 		amt, ok := pi["amount"].(string)
 		if !ok {
 			log.Errorf("amount parse error,")
 			log.Info("address", pi["amount"])
-			return nil, AmountIsNegative
+			return nil, "", AmountIsNegative
 		}
 		if strings.Contains(amt, "-") {
 			log.Errorf("amount have -,")
+<<<<<<< HEAD
 			log.Info("amount", pi["amount"])
 			return nil, PARA_ERROR
+=======
+			log.Info("address", pi["amount"])
+			return nil, "", PARA_ERROR
+>>>>>>> c70595a... review done - UploadExcel
 		}
 		tp := &common.TransferParam{
 			Address: addr,
@@ -267,8 +272,7 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, int64) {
 		TokenType:       tokenType,
 		ContractAddress: contractAddress,
 		EventType:       eventType,
-		NetType:         netType,
-	}, SUCCESS
+	}, netType, SUCCESS
 }
 
 func ParseTxInfoToEatp(txInfo []*common.TransactionInfo) *common.ExcelParam {

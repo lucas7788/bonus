@@ -20,16 +20,16 @@ func InitManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) 
 			return nil, err
 		}
 	}
+	if eatp.TokenType == config.OEP4 || eatp.TokenType == config.ERC20 {
+		if eatp.ContractAddress == "" {
+			return nil, fmt.Errorf("ContractAddress is nil")
+		}
 	manager, err := createManager(eatp, netType, db)
 	if err != nil {
 		return nil, err
 	}
 	//set contract address
 	if eatp.TokenType == config.OEP4 || eatp.TokenType == config.ERC20 {
-		if eatp.ContractAddress == "" {
-			log.Error("ContractAddress is nil")
-			return nil, fmt.Errorf("ContractAddress is nil")
-		}
 		err = manager.SetContractAddress(eatp.ContractAddress)
 		if err != nil {
 			log.Errorf("manager SetContractAddress failed, error: %s", err)
@@ -63,7 +63,7 @@ func RecoverManager(evtTy, netTy string) (interfaces.WithdrawManager, error) {
 func createManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
 
 	switch eatp.TokenType {
-	case config.ONG, config.OEP4, config.ONT, config.OEP5:
+	case config.ONG, config.OEP4, config.ONT:
 		//init ont manager
 		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType, db)
 		if err != nil {

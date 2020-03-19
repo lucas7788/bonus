@@ -5,6 +5,7 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"os"
 	"strings"
+	"path/filepath"
 )
 
 func IsHave(allStr []string, item string) bool {
@@ -22,23 +23,14 @@ func PathExists(path string) bool {
 }
 
 func CheckPath(path string) error {
-	if !PathExists(path) {
-		paths := strings.Split(path, "/")
-		var tempDir string
-		for i := 0; i < len(paths); i++ {
-			if paths[i] == "." {
-				tempDir = paths[i]
-				continue
-			}
-			tempDir = fmt.Sprintf("%s%s%s", tempDir, string(os.PathSeparator), paths[i])
-			if !PathExists(tempDir) {
-				err := os.Mkdir(tempDir, os.ModePerm)
-				if err != nil {
-					log.Errorf("Mkdir failed, error: %s", err)
-					return fmt.Errorf("Mkdir failed, error: %s", err)
-				}
-			}
-		}
+	if PathExists(path) {
+		return nil
 	}
+
+	dirPath := filepath.Dir(path)
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		return fmt.Errorf("mkdir failed: %s", err)
+	}
+
 	return nil
 }

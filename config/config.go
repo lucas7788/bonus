@@ -8,16 +8,11 @@ var Version = ""
 
 var DefConfig = &Config{
 	RestPort:    DEFAULT_REST_PORT,
-	LevelDBPath: "./db/leveldb",
 }
 
 type Config struct {
-	LevelDBPath        string
 	RestPort           uint   `json:"rest_port"`
 	Version            string `json:"version"`
-	HttpMaxConnections int    `json:"http_max_connections"`
-	HttpCertPath       string `json:"http_cert_path"`
-	HttpKeyPath        string `json:"http_key_path"`
 	OntCfg             *Ont   `json:"ont_cfg"`
 	EthCfg             *Eth   `json:"eth_cfg"`
 }
@@ -44,7 +39,7 @@ type Ont struct {
 	OntJsonRpcAddressMainNet string `json:"rpc_addr_main_net"`
 	GasPrice                 uint64 `json:"gas_price"`
 	GasLimit                 uint64 `json:"gas_limit"`
-	WalletFile               string `json:"wallet_file"`
+	WalletDir                string `json:"wallet_file"`
 }
 
 type Eth struct {

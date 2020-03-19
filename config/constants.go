@@ -21,12 +21,8 @@ const (
 	ONT   = "ONT"
 	ONG   = "ONG"
 	OEP4  = "OEP4"
-	OEP5  = "OEP5"
 	ETH   = "ETH"
 	ERC20 = "ERC20"
-	KLAY  = "KLAY"
-	NEO   = "NEO"
-	GAS   = "GAS"
 )
 
 const (

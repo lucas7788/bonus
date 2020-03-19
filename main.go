@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"sync"
 	"syscall"
 )
 
@@ -53,7 +52,6 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("initDB error: %s", err)
 		return
 	}
-	restful.DefBonusMap = new(sync.Map)
 	restful.StartServer()
 	waitToExit()
 }

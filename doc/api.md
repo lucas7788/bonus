@@ -92,11 +92,11 @@ http://127.0.0.1:8080/api/v1/uploadexecl
 ```
 
 
-2. 查询已经上传的所有的eventtype   GET
+2. 查询已经上传的excel的eventtype   GET
 
 请求
 ```
-http://127.0.0.1:8080/api/v1/getallevtty
+http://127.0.0.1:8080/api/v1/getexcelevtty
 ```
 响应
 ```json

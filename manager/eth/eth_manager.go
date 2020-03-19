@@ -211,7 +211,6 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		if err != nil {
 			return err
 		}
-		log.Errorf("fee: %s", feeStr)
 		fee := utils.ToIntByPrecise(feeStr, config.ETH_DECIMALS)
 		amtBig := new(big.Int).Sub(baBig, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)

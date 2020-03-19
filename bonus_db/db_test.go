@@ -41,7 +41,7 @@ func TestInsertSql(t *testing.T) {
 	}
 
 	db.InsertExcelSql(ep)
-	evts, err := db.QueryAllEventType()
+	evts, err := db.QueryExcelEventType()
 	assert.Nil(t, err)
 	fmt.Println(evts)
 

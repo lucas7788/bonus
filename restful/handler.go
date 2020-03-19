@@ -167,8 +167,8 @@ func Withdraw(ctx *routing.Context) error {
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
-func GetAllEventType(ctx *routing.Context) error {
-	eventType, err := bonus_db.DefBonusDB.QueryAllEventType()
+func GetExcelEventType(ctx *routing.Context) error {
+	eventType, err := bonus_db.DefBonusDB.QueryExcelEventType()
 	if err != nil {
 		log.Errorf("QueryAllEventTypeError error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
@@ -326,9 +326,9 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 }
 
 func hasEvtTy(evtTy string) (bool, error) {
-	evtys, err := bonus_db.DefBonusDB.QueryAllEventType()
+	evtys, err := bonus_db.DefBonusDB.QueryExcelEventType()
 	if err != nil {
-		log.Errorf("QueryAllEventType error: %s", err)
+		log.Errorf("QueryExcelEventType error: %s", err)
 		return false, err
 	}
 	for _, ty := range evtys {

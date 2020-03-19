@@ -60,7 +60,7 @@ func (this *BonusDB) Close() {
 	this.db.Close()
 }
 
-func (this *BonusDB) QueryAllEventType() ([]string, error) {
+func (this *BonusDB) QueryExcelEventType() ([]string, error) {
 	strSql := "select EventType from excel_info"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {

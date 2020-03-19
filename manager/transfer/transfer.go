@@ -65,6 +65,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 			}
 			if err != nil {
 				log.Errorf("NewWithdrawTx error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)
+				return err
 				txInfo.TxResult = common.BuildTxFailed
 			} else {
 				txInfo.TxResult = common.NotSend

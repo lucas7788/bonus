@@ -304,7 +304,7 @@ func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int)
 // start == 0 && end == 0 mean query all data
 func (this *BonusDB) QueryExcelParamByEventType(evtType string, start, end int) (*common.ExcelParam, error) {
 	var strSql string
-	if start == 0 && end ==0 {
+	if start == 0 && end == 0 {
 		strSql = "select Id, TokenType,ContractAddress,Address,Amount from excel_info where EventType = ?"
 	} else {
 		strSql = "select Id, TokenType,ContractAddress,Address,Amount from excel_info where EventType = ? order by id DESC limit ?, ?"
@@ -357,7 +357,7 @@ func (this *BonusDB) QueryExcelParamByEventType(evtType string, start, end int) 
 
 func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int) ([]*common.TransactionInfo, error) {
 	var strSql string
-	if start == 0 && end ==0 {
+	if start == 0 && end == 0 {
 		strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 	} else {
 		strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? order by id DESC limit ?, ?"
@@ -370,7 +370,7 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int) ([
 		return nil, err
 	}
 	var rows *sql.Rows
-	if start==0 && end ==0 {
+	if start == 0 && end == 0 {
 		rows, err = stmt.Query(eventType)
 	} else {
 		rows, err = stmt.Query(eventType, start, end)

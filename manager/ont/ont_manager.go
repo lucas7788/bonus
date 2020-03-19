@@ -175,7 +175,7 @@ func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
 		log.Errorf("SendTx failed,txhash: %s, error: %s", hash, err)
 		return fmt.Errorf("SendTx failed,txhash: %s, error: %s", hash, err)
 	}
-	boo := self.VerifyTx(hash, config.RetryLimit)
+	boo, err := self.VerifyTx(hash, config.RetryLimit)
 	if !boo {
 		log.Errorf("[withdrawToken] VerifyTx failed,txhash: %s, error: %s", hash, err)
 		return fmt.Errorf("VerifyTx failed,txhash: %s, error: %s", hash, err)
@@ -433,43 +433,43 @@ func (self *OntManager) SendTx(txHex []byte) (string, error) {
 	return txHash.ToHexString(), nil
 }
 
-func (self *OntManager) VerifyTx(txHash string, retryLimit int) bool {
+func (self *OntManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 	retry := 0
 	for {
 		event, err := self.ontSdk.GetSmartContractEvent(txHash)
 		if event != nil && event.State == 0 {
-			return false
+			return false, fmt.Errorf("tx failed")
 		}
-		if err != nil && retry < config.RetryLimit {
+		if err != nil && retry < retryLimit {
 			if err != nil {
-				log.Errorf("GetSmartContractEvent error: %s, retry: %d", err, retry)
+				log.Errorf("GetSmartContractEvent error: %s, retry: %d, txHash: %s", err, retry, txHash)
 			}
 			retry += 1
 			time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
 			continue
 		}
-		if err != nil && retry >= config.RetryLimit {
+		if err != nil && retry >= retryLimit {
 			log.Errorf("GetSmartContractEvent fail, txhash: %s, err: %s", txHash, err)
-			return false
+			return false, err
 		}
-		if event == nil && retry < config.RetryLimit {
+		if event == nil && retry < retryLimit {
 			retry += 1
 			time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
 			continue
 		}
 		if event == nil {
-			return false
+			return false, fmt.Errorf("no the transaction")
 		}
 		if event.State == 1 {
 			if self.contractAddress != common.ADDRESS_EMPTY {
 				if len(event.Notify) == 2 {
-					return true
+					return true, nil
 				} else {
-					return false
+					return false, fmt.Errorf("uncertain tx")
 				}
 			}
-			return true
+			return true, nil
 		}
-		return false
+		return false, fmt.Errorf("tx failed")
 	}
 }

@@ -7,9 +7,9 @@ import (
 	"github.com/ontio/bonus/manager/interfaces"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 type TxHandleTask struct {
@@ -126,7 +126,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
 				}
 
-				boo := mana.VerifyTx(txInfo.TxHash, 1)
+				boo, err := mana.VerifyTx(txInfo.TxHash, 1)
 				if boo {
 					log.Infof("Failed transactions revalidate success, txhash: %s", txInfo.TxHash)
 					ti, err := mana.GetTxTime(txInfo.TxHash)
@@ -140,7 +140,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					}
 					continue
 				}
-				log.Infof("Failed transactions revalidate failed, txhash: %s", txInfo.TxHash)
+				log.Infof("Failed transactions revalidate failed, txhash: %s, error: %s", txInfo.TxHash, err)
 			}
 			if txInfo != nil && txInfo.TxHex != "" {
 				txHex, err = common2.HexToBytes(txInfo.TxHex)
@@ -233,14 +233,14 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 				log.Info("exit StartVerifyTxTask gorountine")
 				return
 			}
-			boo := mana.VerifyTx(verifyParam.TxHash, config.RetryLimit)
+			boo, err := mana.VerifyTx(verifyParam.TxHash, config.RetryLimit)
 			if !boo {
 				//save failed tx to bonus_db
-				err := bonus_db.DefBonusDB.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxFailed, 0, "Verify failed")
+				err := bonus_db.DefBonusDB.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxFailed, 0, err.Error())
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
 				}
-				log.Errorf("VerifyTx failed, txhash: %s", verifyParam.TxHash)
+				log.Errorf("VerifyTx failed, txhash: %s, error: %s", verifyParam.TxHash, err)
 				continue
 			}
 			ti, err := mana.GetTxTime(verifyParam.TxHash)

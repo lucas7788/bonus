@@ -6,8 +6,8 @@ import (
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type QueryTxInfoParam struct {
@@ -22,12 +22,12 @@ func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
 	netType := ctx.Param("netty")
 	evtty := ctx.Param("evtty")
 	pageSize := ctx.Param("pagesize")
-    pageSi,err := strconv.Atoi(pageSize)
-    if err != nil {
-    	return nil, PARA_ERROR
+	pageSi, err := strconv.Atoi(pageSize)
+	if err != nil {
+		return nil, PARA_ERROR
 	}
 	pageNum := ctx.Param("pagenum")
-	pageNu,err := strconv.Atoi(pageNum)
+	pageNu, err := strconv.Atoi(pageNum)
 	if err != nil {
 		return nil, PARA_ERROR
 	}
@@ -50,12 +50,12 @@ func ParseQueryExcelParam(ctx *routing.Context) (*QueryExcelParam, int64) {
 	evtty := ctx.Param("evtty")
 	netty := ctx.Param("netty")
 	pageNumStr := ctx.Param("pagenum")
-	pageNum,err := strconv.Atoi(pageNumStr)
+	pageNum, err := strconv.Atoi(pageNumStr)
 	if err != nil {
 		return nil, PARA_ERROR
 	}
 	pageSizeStr := ctx.Param("pagesize")
-	pageSize,err := strconv.Atoi(pageSizeStr)
+	pageSize, err := strconv.Atoi(pageSizeStr)
 	if err != nil {
 		return nil, PARA_ERROR
 	}

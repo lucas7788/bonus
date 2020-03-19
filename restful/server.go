@@ -5,10 +5,10 @@ import (
 )
 
 const (
-	POST_EXECL                      = "/api/v1/uploadexecl"
-	POST_TRANSFER                   = "/api/v1/transfer"
-	POST_WITHDRAW                   = "/api/v1/withdraw"
-	POST_SET_GAS_PRICE              = "/api/v1/setgasprice"
+	POST_EXECL         = "/api/v1/uploadexecl"
+	POST_TRANSFER      = "/api/v1/transfer"
+	POST_WITHDRAW      = "/api/v1/withdraw"
+	POST_SET_GAS_PRICE = "/api/v1/setgasprice"
 
 	GET_ALL_EVENT_TYPE              = "/api/v1/getallevtty"
 	GET_TxInfo_EVENT_TYPE           = "/api/v1/gettxInfoevtty/<netty>"

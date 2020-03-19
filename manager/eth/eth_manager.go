@@ -221,9 +221,9 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 	if err != nil {
 		return fmt.Errorf("send tx failed, error:%s", err)
 	}
-	boo := self.VerifyTx(hash, config.RetryLimit)
+	boo, err := self.VerifyTx(hash, config.RetryLimit)
 	if !boo {
-		return fmt.Errorf("verify tx failed")
+		return fmt.Errorf("verify tx failed, error:%s, hash:%s", err, hash)
 	}
 	return nil
 }
@@ -442,31 +442,40 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 	return tx.Hash().String(), nil
 }
 
-func (this *EthManager) VerifyTx(txHash string, retryLimit int) bool {
+func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 	hash := common.HexToHash(txHash)
+	retry := 0
 	for {
 		_, isPending, err := this.ethClient.TransactionByHash(context.Background(), hash)
 		if err == ethereum.NotFound {
 			log.Errorf("[VerifyTx] TransactionByHash error: %s, txHash:%s", err, txHash)
-			return false
+			return false, ethereum.NotFound
 		}
-		if err != nil || isPending {
+		if err != nil {
+			if retry >= retryLimit {
+				return false, err
+			}
+			log.Errorf("[VerifyTx] TransactionByHash error: %s, txHash: %s", err, txHash)
+			retry++
+			time.Sleep(time.Second * config.EthSleepTime)
+			continue
+		}
+		if isPending {
 			log.Errorf("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
 			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
 			continue
 		}
 		receipt, err := this.ethClient.TransactionReceipt(context.Background(), hash)
 		if err == ethereum.NotFound {
-			log.Errorf("[VerifyTx]TransactionReceipt error: %s", err)
-			return false
+			log.Errorf("[VerifyTx]TransactionReceipt error: %s, txHash:%s", err, txHash)
+			return false, ethereum.NotFound
 		}
 		if err != nil {
-			log.Errorf("[VerifyTx]TransactionReceipt error: %s", err)
-			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
-			continue
+			log.Errorf("[VerifyTx]TransactionReceipt error: %s, txHash: %s", err, txHash)
+			return false, err
 		}
 		if receipt != nil && receipt.Status == types.ReceiptStatusSuccessful {
-			return true
+			return true, nil
 		} else {
 			if receipt != nil {
 				bs, err := receipt.MarshalJSON()
@@ -476,7 +485,7 @@ func (this *EthManager) VerifyTx(txHash string, retryLimit int) bool {
 					log.Errorf("[VerifyTx]verify tx failed, err: %s", string(bs))
 				}
 			}
-			return false
+			return false, fmt.Errorf("tx failed")
 		}
 	}
 }

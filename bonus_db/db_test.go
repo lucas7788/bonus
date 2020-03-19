@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init()  {
+func init() {
 
 }
 func TestInsertSql(t *testing.T) {
@@ -45,7 +45,7 @@ func TestInsertSql(t *testing.T) {
 	assert.Nil(t, err)
 	fmt.Println(evts)
 
-	param, err := db.QueryExcelParamByEventType("evtType",0,2)
+	param, err := db.QueryExcelParamByEventType("evtType", 0, 2)
 	assert.Nil(t, err)
 	fmt.Println(param)
 }

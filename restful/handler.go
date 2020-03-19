@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
+	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager"
 	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
@@ -12,7 +13,6 @@ import (
 	"math/big"
 	"strings"
 	"sync"
-	"github.com/ontio/bonus/config"
 )
 
 var DefBonusMap *sync.Map //projectId -> Airdrop
@@ -85,9 +85,9 @@ func GetGasPrice(ctx *routing.Context) error {
 	tokenType := ctx.Param("tokenty")
 	res := ResponsePack(SUCCESS)
 	switch tokenType {
-	case config.ONT,config.ONG,config.OEP4,config.OEP5:
+	case config.ONT, config.ONG, config.OEP4, config.OEP5:
 		res["Result"] = config.DefConfig.OntCfg.GasPrice
-	case config.ETH,config.ERC20:
+	case config.ETH, config.ERC20:
 		gasPrice := new(big.Int).Div(eth.DEFAULT_GAS_PRICE, eth.OneGwei)
 		res["Result"] = gasPrice.Uint64()
 	default:
@@ -97,15 +97,15 @@ func GetGasPrice(ctx *routing.Context) error {
 }
 
 func SetGasPrice(ctx *routing.Context) error {
-	gasPriceInt,tokenTy, errCode := ParseSetGasPriceParam(ctx)
+	gasPriceInt, tokenTy, errCode := ParseSetGasPriceParam(ctx)
 	if errCode != SUCCESS {
 		log.Errorf("ParseSetGasPriceParam error ")
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	switch tokenTy {
-	case config.ONT,config.ONG,config.OEP4,config.OEP5:
+	case config.ONT, config.ONG, config.OEP4, config.OEP5:
 		config.DefConfig.OntCfg.GasPrice = uint64(gasPriceInt)
-	case config.ETH,config.ERC20:
+	case config.ETH, config.ERC20:
 		gasPrice := new(big.Int).SetUint64(uint64(gasPriceInt))
 		eth.DEFAULT_GAS_PRICE = new(big.Int).Mul(gasPrice, eth.OneGwei)
 	default:
@@ -326,12 +326,12 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 }
 
 func hasEvtTy(evtTy string) (bool, error) {
-	evtys,err := bonus_db.DefBonusDB.QueryAllEventType()
+	evtys, err := bonus_db.DefBonusDB.QueryAllEventType()
 	if err != nil {
 		log.Errorf("QueryAllEventType error: %s", err)
 		return false, err
 	}
-	for _,ty := range evtys {
+	for _, ty := range evtys {
 		if ty == evtTy {
 			return true, nil
 		}
@@ -354,7 +354,7 @@ func parseMgr(eventType, netType string) (interfaces.WithdrawManager, int64) {
 			log.Errorf("InitManager error: %s", err)
 			return nil, InitManagerError
 		}
-		DefBonusMap.Store(eventType + netType, mgr)
+		DefBonusMap.Store(eventType+netType, mgr)
 	} else {
 		mgr, ok = mn.(interfaces.WithdrawManager)
 		if !ok {

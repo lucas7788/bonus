@@ -289,11 +289,11 @@ func (this *EthManager) SetContractAddress(address string) error {
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		//err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
-		//if err != nil {
-		//	log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
-		//	return
-		//}
+		err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		if err != nil {
+			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
+			return
+		}
 		for _, trParam := range self.eatp.BillList {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue

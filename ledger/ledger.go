@@ -193,8 +193,20 @@ func OpenLevelDB(file string) (*leveldb.DB, error) {
 	return db, nil
 }
 
+func createFile(path string) error  {
+	if !common.FileExisted("./db") {
+		return os.Mkdir("./db", os.ModeDir)
+	}
+	return nil
+}
 func InitLevelDB() (*leveldb.DB, error) {
-	path := fmt.Sprintf("%s%s%s", config.DefConfig.LevelDBPath, string(os.PathSeparator), "leveldb")
+	if err := createFile("./db");err != nil {
+		return nil, err
+	}
+	if err := createFile(config.DefConfig.LevelDBPath);err != nil {
+		return nil, err
+	}
+	path := fmt.Sprintf("%s%s", config.DefConfig.LevelDBPath)
 	db, err := OpenLevelDB(path)
 	if err != nil {
 		return nil, err

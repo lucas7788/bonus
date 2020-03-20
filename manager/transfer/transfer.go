@@ -55,7 +55,6 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 			continue
 		}
 		if tx == nil {
-			hash, txhex, err := mana.NewWithdrawTx(trParam.Address, trParam.Amount, "")
 			txInfo := &common.TransactionInfo{
 				Id:              trParam.Id,
 				EventType:       eatp.EventType,
@@ -64,16 +63,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 				Address:         trParam.Address,
 				Amount:          trParam.Amount,
 				NetType:         mana.GetNetType(),
-			}
-			if err != nil {
-				log.Errorf("NewWithdrawTx error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)
-				return err
-				txInfo.TxResult = common.BuildTxFailed
-			} else {
-				txInfo.TxResult = common.NotSend
-				txInfo.TxHash = hash
-				txInfo.TxHex = common2.ToHexString(txhex)
-				txInfo.TxResult = common.NotSend
+				TxResult:        common.NotSend,
 			}
 			txInfos = append(txInfos, txInfo)
 		}

@@ -137,7 +137,7 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		//self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
 		for _, trParam := range self.eatp.BillList {
 			if trParam.Amount == "0" {
 				continue

@@ -11,6 +11,7 @@ import (
 	"github.com/qiangxue/fasthttp-routing"
 	"strings"
 	"sync"
+	"fmt"
 )
 
 var DefBonusMap *sync.Map //projectId -> Airdrop
@@ -122,6 +123,9 @@ func Transfer(ctx *routing.Context) error {
 	if mgr.GetStatus() == common.Transfering {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
+	if !ledger.DefBonusLedger.HasTxInfoEvtTy(eventType) {
+		ledger.DefBonusLedger.AppendTxInfoEvtTy(eventType)
+	}
 	mgr.StartTransfer()
 	log.Info("start transfer success")
 	return writeResponse(ctx, ResponsePack(SUCCESS))
@@ -131,6 +135,7 @@ func Withdraw(ctx *routing.Context) error {
 	withdrawParam, errCode := ParseWithdrawParam(ctx)
 	if errCode != SUCCESS || withdrawParam.EventType == "" || withdrawParam.NetType == "" ||
 		withdrawParam.TokenType == "" || withdrawParam.Address == "" {
+			log.Errorf("[Withdraw] ParseWithdrawParam error:%s", errCode)
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	boo := ledger.DefBonusLedger.HasExcelEvtTy(withdrawParam.EventType)
@@ -220,6 +225,7 @@ func GetExcelParamByEvtType(ctx *routing.Context) error {
 		}
 		start := (param.PageNum - 1) * param.PageSize
 		end := start + param.PageSize
+		fmt.Println(mgr.GetDB())
 		excelParam, err = mgr.GetDB().QueryExcelParamByEventType(param.EvtType, start, end)
 	}
 
@@ -315,9 +321,11 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 func parseMgr(eventType, netType string) (interfaces.WithdrawManager, int64) {
 	var mgr interfaces.WithdrawManager
 	mn, ok := DefBonusMap.Load(eventType + netType)
+
 	//TODO
 	if !ok || mn == nil {
-		mgr, err := manager.RecoverManager(eventType, netType)
+		var err error
+		mgr, err = manager.RecoverManager(eventType, netType)
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
 			return nil, InitManagerError

@@ -34,4 +34,5 @@ const (
 	SleepTime     = 3
 	EthSendTxSlot = 20
 	EthSleepTime  = 6
+	PendingLimit  = 100
 )

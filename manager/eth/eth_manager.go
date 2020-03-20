@@ -25,6 +25,7 @@ import (
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/transfer"
 	"github.com/ontio/bonus/utils"
+	common3 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
 	"os"
 )
@@ -498,9 +499,26 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 	return tx.Hash().String(), nil
 }
 
+func (this *EthManager) reSendTx(txHash string) {
+	txInfo, err := this.db.QueryTxHexByTxHash(txHash)
+	if err != nil {
+		log.Errorf("[reSendTx] QueryTxHexByTxHash error:%s", err)
+		return
+	}
+	if txInfo.TxHex != "" {
+		txHex, _ := common3.HexToBytes(txInfo.TxHex)
+		_, err := this.SendTx(txHex)
+		if err != nil {
+			log.Errorf("[reSendTx] error:%s, txHash: %s", err, txHash)
+			return
+		}
+	}
+}
+
 func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 	hash := common.HexToHash(txHash)
 	retry := 0
+	pendingAmt := 0
 	for {
 		_, isPending, err := this.ethClient.TransactionByHash(context.Background(), hash)
 		if err == ethereum.NotFound {
@@ -517,7 +535,13 @@ func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 			continue
 		}
 		if isPending {
-			log.Infof("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
+			if pendingAmt < config.PendingLimit {
+				pendingAmt++
+				log.Infof("[VerifyTx] TransactionByHash error:%s, txHash:%s, isPending:%t", err, txHash, isPending)
+			} else {
+				this.reSendTx(txHash)
+				return this.VerifyTx(txHash, config.RetryLimit)
+			}
 			time.Sleep(time.Duration(config.EthSleepTime) * time.Second)
 			continue
 		}

@@ -270,6 +270,37 @@ func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult)
 	return 0, nil
 }
 
+func (this *BonusDB) QueryTxHexByTxHash(txHash string) (*common.TransactionInfo, error) {
+	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where TxHash=?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query(txHash)
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var txHash, txHex string
+		var txResult int
+		if err = rows.Scan(&txHash, &txHex, &txResult); err != nil {
+			return nil, err
+		}
+		return &common.TransactionInfo{
+			TxHash:   txHash,
+			TxHex:    txHex,
+			TxResult: common.TxResult(txResult),
+		}, nil
+	}
+	return nil, nil
+}
+
 func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {
 	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and Id=?"
 	stmt, err := this.db.Prepare(strSql)

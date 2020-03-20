@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/eth"
@@ -28,6 +29,20 @@ func InitManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawMa
 		}
 	}
 	return manager, nil
+}
+
+func RecoverManager(evtTy, netTy string) (interfaces.WithdrawManager, error) {
+	db, err := bonus_db.NewBonusDB(evtTy, netTy)
+	if err != nil {
+		return nil, err
+	}
+	excelParam, err := db.QueryExcelParamByEventType(evtTy, 0, 0)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	db.Close()
+	return InitManager(excelParam, netTy)
 }
 
 func createManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {

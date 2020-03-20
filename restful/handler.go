@@ -2,9 +2,9 @@ package restful
 
 import (
 	"encoding/json"
-	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
+	"github.com/ontio/bonus/ledger"
 	"github.com/ontio/bonus/manager"
 	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
@@ -22,10 +22,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	boo, err := hasEvtTy(arg.EventType)
-	if err != nil {
-		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
-	}
+	boo := ledger.DefBonusLedger.HasExcelEvtTy(arg.EventType)
 	if boo {
 		log.Errorf("DuplicateEventType: %s", arg.EventType)
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
@@ -35,12 +32,13 @@ func UpLoadExcel(ctx *routing.Context) error {
 	if DefBonusMap == nil {
 		DefBonusMap = new(sync.Map)
 	} else {
-		mn, ok := DefBonusMap.Load(arg.EventType)
+		mn, ok := DefBonusMap.Load(arg.EventType + arg.NetType)
 		if ok && mn != nil {
 			mgr, _ = mn.(interfaces.WithdrawManager)
 			hasInit = true
 		}
 	}
+	var err error
 	if !hasInit {
 		mgr, err = manager.InitManager(arg, arg.NetType)
 		if err != nil {
@@ -50,7 +48,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 		DefBonusMap.Store(arg.EventType+arg.NetType, mgr)
 	}
 	updateExcelParam(mgr, arg)
-	err = bonus_db.DefBonusDB.InsertExcelSql(arg)
+	err = mgr.InsertExcelSql()
 	if err != nil {
 		log.Errorf("InsertExcelSql error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
@@ -62,7 +60,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 
 func GetAdminBalanceByEventType(ctx *routing.Context) error {
 	evtType := ctx.Param("evtty")
-	boo, _ := hasEvtTy(evtType)
+	boo := ledger.DefBonusLedger.HasExcelEvtTy(evtType)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
@@ -119,7 +117,7 @@ func Transfer(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	boo, _ := hasEvtTy(eventType)
+	boo := ledger.DefBonusLedger.HasExcelEvtTy(eventType)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
@@ -142,7 +140,7 @@ func Withdraw(ctx *routing.Context) error {
 		withdrawParam.TokenType == "" || withdrawParam.Address == "" {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	boo, _ := hasEvtTy(withdrawParam.EventType)
+	boo := ledger.DefBonusLedger.HasExcelEvtTy(withdrawParam.EventType)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
@@ -168,13 +166,8 @@ func Withdraw(ctx *routing.Context) error {
 }
 
 func GetExcelEventType(ctx *routing.Context) error {
-	eventType, err := bonus_db.DefBonusDB.QueryExcelEventType()
-	if err != nil {
-		log.Errorf("QueryAllEventTypeError error: %s", err)
-		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
-	}
 	res := ResponsePack(SUCCESS)
-	res["Result"] = eventType
+	res["Result"] = ledger.DefBonusLedger.AllEvtTys.AllExcelEvtTy
 	return writeResponse(ctx, res)
 }
 func GetTxInfoEventType(ctx *routing.Context) error {
@@ -182,31 +175,26 @@ func GetTxInfoEventType(ctx *routing.Context) error {
 	if netTy != config.TestNet && netTy != config.MainNet {
 		return writeResponse(ctx, ResponsePack(NetTypeError))
 	}
-	eventType, err := bonus_db.DefBonusDB.QueryTxInfoEventType(netTy)
-	if err != nil {
-		log.Errorf("QueryAllEventTypeError error: %s", err)
-		return writeResponse(ctx, ResponsePack(QueryAllEventTypeError))
-	}
 	res := ResponsePack(SUCCESS)
-	res["Result"] = eventType
+	res["Result"] = ledger.DefBonusLedger.AllEvtTys.AllTxInfoEvtTy
 	return writeResponse(ctx, res)
 }
 
 func GetTransferProgress(ctx *routing.Context) error {
 	evtty := ctx.Param("evtty")
-	boo, _ := hasEvtTy(evtty)
+	boo := ledger.DefBonusLedger.HasTxInfoEvtTy(evtty)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
 	}
 	netty := ctx.Param("netty")
-	res, err := bonus_db.DefBonusDB.QueryTransferProgress(evtty, netty)
-	if err != nil {
-		log.Errorf("[GetTransferProgress] QueryTransferProgress failed: %s", err)
-		return writeResponse(ctx, ResponsePack(QueryTransferProgressFailed))
-	}
 	mgr, errCode := parseMgr(evtty, netty)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	res, err := mgr.GetDB().QueryTransferProgress(evtty, netty)
+	if err != nil {
+		log.Errorf("[GetTransferProgress] QueryTransferProgress failed: %s", err)
+		return writeResponse(ctx, ResponsePack(QueryTransferProgressFailed))
 	}
 	total := mgr.GetTotal()
 	res["total"] = total
@@ -220,28 +208,32 @@ func GetExcelParamByEvtType(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	boo, _ := hasEvtTy(param.EvtType)
+	boo := ledger.DefBonusLedger.HasExcelEvtTy(param.EvtType)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
+	mgr, errCode := parseMgr(param.EvtType, param.NetType)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	var excelParam *common.ExcelParam
 	var err error
 	if param.PageSize == 0 && param.PageNum == 0 {
-		excelParam, err = bonus_db.DefBonusDB.QueryExcelParamByEventType(param.EvtType, 0, 0)
+		excelParam, err = mgr.GetDB().QueryExcelParamByEventType(param.EvtType, 0, 0)
 	} else {
 		if param.PageNum <= 0 {
 			param.PageNum = 1
 		}
 		start := (param.PageNum - 1) * param.PageSize
 		end := start + param.PageSize
-		excelParam, err = bonus_db.DefBonusDB.QueryExcelParamByEventType(param.EvtType, start, end)
+		excelParam, err = mgr.GetDB().QueryExcelParamByEventType(param.EvtType, start, end)
 	}
 
 	if err != nil {
 		log.Errorf("QueryExcelParamByEventType error:%s", err)
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	mgr, errCode := parseMgr(param.EvtType, param.NetType)
+
 	updateExcelParam(mgr, excelParam)
 	res := ResponsePack(SUCCESS)
 	res["Result"] = excelParam
@@ -275,24 +267,25 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	boo, _ := hasEvtTy(param.EvtTy)
+	boo := ledger.DefBonusLedger.HasTxInfoEvtTy(param.EvtTy)
 	if !boo {
 		return writeResponse(ctx, ResponsePack(NotExistenceEvtType))
+	}
+	mgr, errCode := parseMgr(param.EvtTy, param.NetTy)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	if param.PageNum < 1 {
 		param.PageNum = 1
 	}
 	start := (param.PageNum - 1) * param.PageSize
 	end := start + param.PageSize
-	txInfo, err := bonus_db.DefBonusDB.QueryTxInfoByEventType(param.EvtTy, start, end)
+	txInfo, err := mgr.GetDB().QueryTxInfoByEventType(param.EvtTy, start, end)
 	if err != nil {
 		log.Errorf("QueryTxInfoByEventType error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryResultByEventType))
 	}
-	mgr, errCode := parseMgr(param.EvtTy, param.NetTy)
-	if errCode != SUCCESS {
-		return writeResponse(ctx, ResponsePack(errCode))
-	}
+
 	sum, err := mgr.ComputeSum()
 	if err != nil {
 		log.Errorf("InitManager error: %s", err)
@@ -325,31 +318,12 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	return writeResponse(ctx, r)
 }
 
-func hasEvtTy(evtTy string) (bool, error) {
-	evtys, err := bonus_db.DefBonusDB.QueryExcelEventType()
-	if err != nil {
-		log.Errorf("QueryExcelEventType error: %s", err)
-		return false, err
-	}
-	for _, ty := range evtys {
-		if ty == evtTy {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func parseMgr(eventType, netType string) (interfaces.WithdrawManager, int64) {
 	var mgr interfaces.WithdrawManager
 	mn, ok := DefBonusMap.Load(eventType + netType)
 	//TODO
 	if !ok || mn == nil {
-		res, err := bonus_db.DefBonusDB.QueryExcelParamByEventType(eventType, 0, 0)
-		if err != nil {
-			log.Errorf("there is no the eventType: %s, err: %s", eventType, err)
-			return nil, NoTheEventTypeError
-		}
-		mgr, err = manager.InitManager(res, netType)
+		mgr, err := manager.RecoverManager(eventType, netType)
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
 			return nil, InitManagerError

@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/cmd"
 	"github.com/ontio/bonus/config"
+	"github.com/ontio/bonus/ledger"
+	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
@@ -59,9 +60,9 @@ func startBonus(ctx *cli.Context) {
 
 func initDB(ctx *cli.Context) error {
 	var err error
-	bonus_db.DefBonusDB, err = bonus_db.NewBonusDB()
+	ledger.DefBonusLedger, err = ledger.NewBonusLedger()
 	if err != nil {
-		return fmt.Errorf("ConnectDB error: %s", err)
+		return fmt.Errorf("[initDB]NewBonusLedger error: %s", err)
 	}
 	return nil
 }
@@ -84,7 +85,12 @@ func waitToExit() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
 		for sig := range sc {
-			bonus_db.DefBonusDB.Close()
+			ledger.DefBonusLedger.Close()
+			restful.DefBonusMap.Range(func(key, value interface{}) bool {
+				mgr, _ := value.(interfaces.WithdrawManager)
+				mgr.CloseDB()
+				return true
+			})
 			log.Infof("bonus server received exit signal: %s.", sig.String())
 			close(exit)
 			break

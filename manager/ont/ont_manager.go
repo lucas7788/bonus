@@ -2,6 +2,7 @@ package ont
 
 import (
 	"fmt"
+	"github.com/ontio/bonus/bonus_db"
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/transfer"
@@ -30,6 +31,7 @@ type OntManager struct {
 	txHandleTask    *transfer.TxHandleTask
 	eatp            *common2.ExcelParam
 	netType         string
+	db              *bonus_db.BonusDB
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
@@ -83,16 +85,31 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 		return nil, err
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
-
+	db, err := bonus_db.NewBonusDB(eatp.EventType, eatp.NetType)
+	if err != nil {
+		return nil, err
+	}
 	ontManager := &OntManager{
 		account: acct,
 		ontSdk:  ontSdk,
 		cfg:     cfg,
 		eatp:    eatp,
 		netType: netType,
+		db:      db,
 	}
-
 	return ontManager, nil
+}
+func (this *OntManager) InsertExcelSql() error {
+	return this.db.InsertExcelSql(this.eatp)
+}
+func (this *OntManager) GetDB() *bonus_db.BonusDB {
+	return this.db
+}
+func (this *OntManager) QueryTransferProgress() (map[string]int, error) {
+	return this.db.QueryTransferProgress(this.eatp.EventType, this.eatp.NetType)
+}
+func (this *OntManager) CloseDB() {
+	this.db.Close()
 }
 
 func (self *OntManager) GetNetType() string {
@@ -135,7 +152,7 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 }
 
 func (self *OntManager) StartHandleTxTask() {
-	txHandleTask := transfer.NewTxHandleTask(self.eatp.TokenType)
+	txHandleTask := transfer.NewTxHandleTask(self.eatp.TokenType, self.db)
 	self.txHandleTask = txHandleTask
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
 	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)

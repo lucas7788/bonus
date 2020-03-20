@@ -11,14 +11,14 @@ import (
 	"strings"
 )
 
-var DefBonusDB *BonusDB
+//var DefBonusDB *BonusDB
 
 type BonusDB struct {
 	db *sql.DB
 }
 
-func NewBonusDB() (*BonusDB, error) {
-	dbFileName := "./db/" + "bonus" + ".db"
+func NewBonusDB(evtTy, netTy string) (*BonusDB, error) {
+	dbFileName := "./db/" + evtTy + "_" + netTy + ".db"
 	if !common2.FileExisted("./db") {
 		err := os.Mkdir("./db", os.ModePerm)
 		if err != nil {

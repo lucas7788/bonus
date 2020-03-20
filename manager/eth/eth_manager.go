@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ontio/bonus/bonus_db"
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/transfer"
@@ -53,6 +54,7 @@ type EthManager struct {
 	lock         sync.RWMutex
 	eatp         *common2.ExcelParam
 	netType      string
+	db           *bonus_db.BonusDB
 }
 
 func (this *EthManager) GetExcelParam() *common2.ExcelParam {
@@ -102,6 +104,11 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		account = accs[0]
 	}
 	log.Infof("eth admin address: %s", account.Address.Hex())
+
+	db, err := bonus_db.NewBonusDB(eatp.EventType, eatp.NetType)
+	if err != nil {
+		return nil, err
+	}
 	mgr := &EthManager{
 		tokens:       make(map[string]*Token),
 		account:      account,
@@ -110,6 +117,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		txTimeClient: c,
 		eatp:         eatp,
 		netType:      netType,
+		db:           db,
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -124,6 +132,19 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		return nil, fmt.Errorf("NewEthManager: parse erc20 abi failed, %s", err)
 	}
 	return mgr, nil
+}
+
+func (this *EthManager) InsertExcelSql() error {
+	return this.db.InsertExcelSql(this.eatp)
+}
+func (this *EthManager) QueryTransferProgress() (map[string]int, error) {
+	return this.db.QueryTransferProgress(this.eatp.EventType, this.eatp.NetType)
+}
+func (this EthManager) GetDB() *bonus_db.BonusDB {
+	return this.db
+}
+func (this *EthManager) CloseDB() {
+	this.db.Close()
 }
 
 func (self *EthManager) GetNetType() string {
@@ -278,7 +299,7 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 
 func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
-	self.txHandleTask = transfer.NewTxHandleTask(self.eatp.TokenType)
+	self.txHandleTask = transfer.NewTxHandleTask(self.eatp.TokenType, self.db)
 	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }

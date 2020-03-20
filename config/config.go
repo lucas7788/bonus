@@ -8,7 +8,7 @@ var Version = ""
 
 var DefConfig = &Config{
 	RestPort:    DEFAULT_REST_PORT,
-	LevelDBPath: "./leveldb",
+	LevelDBPath: "./db/leveldb",
 }
 
 type Config struct {

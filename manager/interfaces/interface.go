@@ -1,6 +1,9 @@
 package interfaces
 
-import "github.com/ontio/bonus/common"
+import (
+	"github.com/ontio/bonus/bonus_db"
+	"github.com/ontio/bonus/common"
+)
 
 type WithdrawManager interface {
 	NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error)
@@ -20,4 +23,7 @@ type WithdrawManager interface {
 	GetNetType() string
 	GetTotal() int
 	GetExcelParam() *common.ExcelParam
+	InsertExcelSql() error
+	CloseDB()
+	GetDB() *bonus_db.BonusDB
 }

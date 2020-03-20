@@ -26,4 +26,6 @@ type WithdrawManager interface {
 	InsertExcelSql() error
 	CloseDB()
 	GetDB() *bonus_db.BonusDB
+	SetGasPrice(gasPrice int)
+	GetGasPrice() int
 }

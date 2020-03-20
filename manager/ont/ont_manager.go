@@ -32,9 +32,10 @@ type OntManager struct {
 	eatp            *common2.ExcelParam
 	netType         string
 	db              *bonus_db.BonusDB
+	gasPrice        int
 }
 
-func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
+func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*OntManager, error) {
 	var rpcAddr string
 	if netType == config.MainNet {
 		rpcAddr = cfg.OntJsonRpcAddressMainNet
@@ -85,17 +86,14 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 		return nil, err
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
-	db, err := bonus_db.NewBonusDB(eatp.EventType, eatp.NetType)
-	if err != nil {
-		return nil, err
-	}
 	ontManager := &OntManager{
-		account: acct,
-		ontSdk:  ontSdk,
-		cfg:     cfg,
-		eatp:    eatp,
-		netType: netType,
-		db:      db,
+		account:  acct,
+		ontSdk:   ontSdk,
+		cfg:      cfg,
+		eatp:     eatp,
+		netType:  netType,
+		db:       db,
+		gasPrice: int(cfg.GasPrice),
 	}
 	return ontManager, nil
 }
@@ -105,6 +103,14 @@ func (this *OntManager) InsertExcelSql() error {
 func (this *OntManager) GetDB() *bonus_db.BonusDB {
 	return this.db
 }
+func (this *OntManager) SetGasPrice(gasPrice int) {
+	this.gasPrice = gasPrice
+}
+
+func (this *OntManager) GetGasPrice() int {
+	return this.gasPrice
+}
+
 func (this *OntManager) QueryTransferProgress() (map[string]int, error) {
 	return this.db.QueryTransferProgress(this.eatp.EventType, this.eatp.NetType)
 }

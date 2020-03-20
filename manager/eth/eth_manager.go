@@ -55,13 +55,14 @@ type EthManager struct {
 	eatp         *common2.ExcelParam
 	netType      string
 	db           *bonus_db.BonusDB
+	gasPrice     *big.Int
 }
 
 func (this *EthManager) GetExcelParam() *common2.ExcelParam {
 	return this.eatp
 }
 
-func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
+func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*EthManager, error) {
 	var rpcAddr string
 	if netType == config.MainNet {
 		rpcAddr = cfg.RpcAddrMainNet
@@ -105,10 +106,6 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	}
 	log.Infof("eth admin address: %s", account.Address.Hex())
 
-	db, err := bonus_db.NewBonusDB(eatp.EventType, eatp.NetType)
-	if err != nil {
-		return nil, err
-	}
 	mgr := &EthManager{
 		tokens:       make(map[string]*Token),
 		account:      account,
@@ -118,6 +115,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		eatp:         eatp,
 		netType:      netType,
 		db:           db,
+		gasPrice:     DEFAULT_GAS_PRICE,
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -134,6 +132,15 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	return mgr, nil
 }
 
+func parseGasPriceToGwei(gasPrice *big.Int) int {
+	b := new(big.Int).Div(gasPrice, OneGwei)
+	return int(b.Int64())
+}
+func parseGweiToGasPrice(gasPrice int) *big.Int {
+	temp := new(big.Int).SetUint64(uint64(gasPrice))
+	return new(big.Int).Mul(temp, OneGwei)
+}
+
 func (this *EthManager) InsertExcelSql() error {
 	return this.db.InsertExcelSql(this.eatp)
 }
@@ -145,6 +152,13 @@ func (this EthManager) GetDB() *bonus_db.BonusDB {
 }
 func (this *EthManager) CloseDB() {
 	this.db.Close()
+}
+func (this *EthManager) SetGasPrice(gasPrice int) {
+	this.gasPrice = parseGweiToGasPrice(gasPrice)
+}
+
+func (this *EthManager) GetGasPrice() int {
+	return parseGasPriceToGwei(this.gasPrice)
 }
 
 func (self *EthManager) GetNetType() string {

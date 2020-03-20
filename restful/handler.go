@@ -6,11 +6,9 @@ import (
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/ledger"
 	"github.com/ontio/bonus/manager"
-	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
-	"math/big"
 	"strings"
 	"sync"
 )
@@ -27,6 +25,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 		log.Errorf("DuplicateEventType: %s", arg.EventType)
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
+	ledger.DefBonusLedger.AppendExcelEvtTy(arg.EventType)
 	hasInit := false
 	var mgr interfaces.WithdrawManager
 	if DefBonusMap == nil {
@@ -40,7 +39,7 @@ func UpLoadExcel(ctx *routing.Context) error {
 	}
 	var err error
 	if !hasInit {
-		mgr, err = manager.InitManager(arg, arg.NetType)
+		mgr, err = manager.InitManager(arg, arg.NetType, nil)
 		if err != nil {
 			log.Errorf("InitManager error: %s", err)
 			return writeResponse(ctx, ResponsePack(InitManagerError))
@@ -80,35 +79,29 @@ func GetAdminBalanceByEventType(ctx *routing.Context) error {
 }
 
 func GetGasPrice(ctx *routing.Context) error {
-	tokenType := ctx.Param("tokenty")
-	res := ResponsePack(SUCCESS)
-	switch tokenType {
-	case config.ONT, config.ONG, config.OEP4, config.OEP5:
-		res["Result"] = config.DefConfig.OntCfg.GasPrice
-	case config.ETH, config.ERC20:
-		gasPrice := new(big.Int).Div(eth.DEFAULT_GAS_PRICE, eth.OneGwei)
-		res["Result"] = gasPrice.Uint64()
-	default:
-		return writeResponse(ctx, ResponsePack(NotSupportTokenType))
+	netty := ctx.Param("netty")
+	evtty := ctx.Param("evtty")
+	mgr, errCode := parseMgr(evtty, netty)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
 	}
+	res := ResponsePack(SUCCESS)
+	res["Result"] = mgr.GetGasPrice()
 	return writeResponse(ctx, res)
 }
 
 func SetGasPrice(ctx *routing.Context) error {
-	gasPriceInt, tokenTy, errCode := ParseSetGasPriceParam(ctx)
+	gasPriceInt, evtTy, netTy, errCode := ParseSetGasPriceParam(ctx)
 	if errCode != SUCCESS {
 		log.Errorf("ParseSetGasPriceParam error ")
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	switch tokenTy {
-	case config.ONT, config.ONG, config.OEP4, config.OEP5:
-		config.DefConfig.OntCfg.GasPrice = uint64(gasPriceInt)
-	case config.ETH, config.ERC20:
-		gasPrice := new(big.Int).SetUint64(uint64(gasPriceInt))
-		eth.DEFAULT_GAS_PRICE = new(big.Int).Mul(gasPrice, eth.OneGwei)
-	default:
-		return writeResponse(ctx, ResponsePack(NotSupportTokenType))
+	mgr, err := parseMgr(evtTy, netTy)
+	if err != SUCCESS {
+		return writeResponse(ctx, ResponsePack(err))
 	}
+	mgr.SetGasPrice(int(gasPriceInt))
+	ledger.DefBonusLedger.SetGasPrice(evtTy, netTy, int(gasPriceInt))
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
@@ -148,6 +141,7 @@ func Withdraw(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
+
 	if mgr.VerifyAddress(withdrawParam.Address) == false {
 		return writeResponse(ctx, ResponsePack(AddressIsWrong))
 	}

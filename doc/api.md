@@ -226,7 +226,8 @@ http://127.0.0.1:8080/api/v1/getgasprice/ETH
     "method": "setgasprice",
     "params": {
     	"gasPrice":50,
-    	"tokenType":"ETH"
+    	"eventType":"sss",
+    	"netType":"testnet"
     }
 }
 ```

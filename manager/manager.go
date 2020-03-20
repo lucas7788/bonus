@@ -5,14 +5,22 @@ import (
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
+	"github.com/ontio/bonus/ledger"
 	"github.com/ontio/bonus/manager/eth"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/bonus/manager/ont"
 	"github.com/ontio/ontology/common/log"
 )
 
-func InitManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
-	manager, err := createManager(eatp, netType)
+func InitManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
+	if db == nil {
+		var err error
+		db, err = bonus_db.NewBonusDB(eatp.EventType, netType)
+		if err != nil {
+			return nil, err
+		}
+	}
+	manager, err := createManager(eatp, netType, db)
 	if err != nil {
 		return nil, err
 	}
@@ -41,22 +49,29 @@ func RecoverManager(evtTy, netTy string) (interfaces.WithdrawManager, error) {
 		db.Close()
 		return nil, err
 	}
-	db.Close()
-	return InitManager(excelParam, netTy)
+	mgr, err := InitManager(excelParam, netTy, db)
+	if err != nil {
+		return nil, err
+	}
+	gasPrice, _ := ledger.DefBonusLedger.GetGasPrice(evtTy, netTy)
+	if gasPrice != 0 {
+		mgr.SetGasPrice(gasPrice)
+	}
+	return mgr, err
 }
 
-func createManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
+func createManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
 
 	switch eatp.TokenType {
 	case config.ONG, config.OEP4, config.ONT, config.OEP5:
 		//init ont manager
-		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType)
+		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType, db)
 		if err != nil {
 			return nil, err
 		}
 		return ontManager, nil
 	case config.ERC20, config.ETH:
-		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType)
+		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType, db)
 		if err != nil {
 			return nil, err
 		}

@@ -136,28 +136,37 @@ func ParseWithdrawParam(ctx *routing.Context) (*common.WithdrawParam, int64) {
 	}, SUCCESS
 }
 
-func ParseSetGasPriceParam(ctx *routing.Context) (float64, string, int64) {
+func ParseSetGasPriceParam(ctx *routing.Context) (float64, string, string, int64) {
 	param, errCode := parse(ctx)
 	if errCode != SUCCESS {
-		return 0, "", PARA_ERROR
+		return 0, "", "", PARA_ERROR
 	}
-	tokenType, ok := param["tokenType"]
+	evtTy, ok := param["eventType"]
 	if !ok {
-		return 0, "", PARA_ERROR
+		return 0, "", "", PARA_ERROR
 	}
-	tokenTy, ok := tokenType.(string)
+	et, ok := evtTy.(string)
 	if !ok {
-		return 0, "", PARA_ERROR
+		return 0, "", "", PARA_ERROR
+	}
+	netTy, ok := param["netType"]
+	if !ok {
+		return 0, "", "", PARA_ERROR
+	}
+	nt, ok := netTy.(string)
+	if !ok {
+		return 0, "", "", PARA_ERROR
 	}
 	gasPrice, ok := param["gasPrice"]
 	if !ok {
-		return 0, "", PARA_ERROR
+		return 0, "", "", PARA_ERROR
 	}
 	gasPri, ok := gasPrice.(float64)
 	if !ok {
-		return 0, "", PARA_ERROR
+		return 0, "", "", PARA_ERROR
 	}
-	return gasPri, tokenTy, SUCCESS
+
+	return gasPri, et, nt, SUCCESS
 }
 
 func parse(ctx *routing.Context) (map[string]interface{}, int64) {

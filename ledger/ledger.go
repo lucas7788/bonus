@@ -11,6 +11,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"io"
 	"os"
+	"strconv"
 )
 
 //excel_evt_ty -> allExcelEvtType
@@ -21,6 +22,23 @@ var DefBonusLedger *BonusLedger
 type BonusLedger struct {
 	db        *leveldb.DB
 	AllEvtTys *AllEvtTy
+}
+
+func (this *BonusLedger) GetGasPrice(evtTy, netTy string) (int, error) {
+	gasBs, err := this.db.Get([]byte(config.KEY_GAS_PRICE+evtTy+netTy), nil)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(string(gasBs))
+}
+
+func (this *BonusLedger) SetGasPrice(evtTy, netTy string, gasPrice int) error {
+	err := this.db.Put([]byte(config.KEY_GAS_PRICE+evtTy+netTy), []byte(strconv.Itoa(gasPrice)), nil)
+	if err != nil {
+		log.Errorf("SetGasPrice error:%s", err)
+		return err
+	}
+	return nil
 }
 
 func (this *BonusLedger) Close() {
@@ -35,6 +53,10 @@ func NewBonusLedger() (*BonusLedger, error) {
 
 	bl := &BonusLedger{
 		db: db,
+		AllEvtTys: &AllEvtTy{
+			AllExcelEvtTy:  make([]string, 0),
+			AllTxInfoEvtTy: make([]string, 0),
+		},
 	}
 	err = bl.init()
 	if err != nil {
@@ -93,12 +115,17 @@ func read(source *common.ZeroCopySource) ([]string, error) {
 }
 
 func (this *BonusLedger) init() error {
-	val, err := this.db.Get([]byte("excel_evt_ty"), nil)
-	if err != nil {
+	val, err := this.db.Get([]byte(config.KEY_EVT_TY), nil)
+	if err == leveldb.ErrNotFound {
+		return nil
+	} else if err != nil {
 		return err
 	}
 	source := common.NewZeroCopySource(val)
-	evts := &AllEvtTy{}
+	evts := &AllEvtTy{
+		AllExcelEvtTy:  make([]string, 0),
+		AllTxInfoEvtTy: make([]string, 0),
+	}
 	err = evts.Deserialize(source)
 	if err != nil {
 		return err
@@ -115,6 +142,27 @@ func (this *BonusLedger) HasExcelEvtTy(evtTy string) bool {
 	}
 	return false
 }
+
+func (this *BonusLedger) AppendExcelEvtTy(evtTy string) {
+	this.AllEvtTys.AllExcelEvtTy = append(this.AllEvtTys.AllExcelEvtTy, evtTy)
+	this.updateDB()
+}
+
+func (this *BonusLedger) updateDB() {
+	sink := common.NewZeroCopySink(nil)
+	this.AllEvtTys.Serialize(sink)
+	err := this.db.Put([]byte(config.KEY_EVT_TY), sink.Bytes(), nil)
+	if err != nil {
+		log.Errorf("[AppendExcelEvtTy] error: %s", err)
+		return
+	}
+}
+
+func (this *BonusLedger) AppendTxInfoEvtTy(evtTy string) {
+	this.AllEvtTys.AllTxInfoEvtTy = append(this.AllEvtTys.AllTxInfoEvtTy, evtTy)
+	this.updateDB()
+}
+
 func (this *BonusLedger) HasTxInfoEvtTy(evtTy string) bool {
 	for _, ty := range this.AllEvtTys.AllTxInfoEvtTy {
 		if ty == evtTy {

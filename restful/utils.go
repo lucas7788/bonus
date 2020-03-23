@@ -253,13 +253,8 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, string, int64) {
 		}
 		if strings.Contains(amt, "-") {
 			log.Errorf("amount have -,")
-<<<<<<< HEAD
 			log.Info("amount", pi["amount"])
-			return nil, PARA_ERROR
-=======
-			log.Info("address", pi["amount"])
 			return nil, "", PARA_ERROR
->>>>>>> c70595a... review done - UploadExcel
 		}
 		tp := &common.TransferParam{
 			Address: addr,

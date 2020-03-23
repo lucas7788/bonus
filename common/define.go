@@ -61,6 +61,7 @@ type ExcelParam struct {
 	EstimateFee     string
 	Sum             string
 	AdminBalance    map[string]string
+	NetType         string
 	Total           int
 }
 

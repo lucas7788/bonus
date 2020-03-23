@@ -153,7 +153,6 @@ func (self *OntManager) StartTransfer() {
 
 func (self *OntManager) GetStatus() common2.TransferStatus {
 	if self.txHandleTask == nil {
-		log.Info("self.txHandleTask is nil")
 		return common2.NotTransfer
 	}
 	return self.txHandleTask.TransferStatus

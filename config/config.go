@@ -8,13 +8,15 @@ var Version = ""
 
 var DefConfig = &Config{
 	RestPort:    DEFAULT_REST_PORT,
+	LevelDBPath: "./db/leveldb",
 }
 
 type Config struct {
-	RestPort           uint   `json:"rest_port"`
-	Version            string `json:"version"`
-	OntCfg             *Ont   `json:"ont_cfg"`
-	EthCfg             *Eth   `json:"eth_cfg"`
+	LevelDBPath string
+	RestPort    uint   `json:"rest_port"`
+	Version     string `json:"version"`
+	OntCfg      *Ont   `json:"ont_cfg"`
+	EthCfg      *Eth   `json:"eth_cfg"`
 }
 
 const (

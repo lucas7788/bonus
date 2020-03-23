@@ -24,6 +24,7 @@ func InitManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) 
 		if eatp.ContractAddress == "" {
 			return nil, fmt.Errorf("ContractAddress is nil")
 		}
+	}
 	manager, err := createManager(eatp, netType, db)
 	if err != nil {
 		return nil, err

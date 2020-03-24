@@ -203,6 +203,7 @@ func GetExcelParamByEvtType(ctx *routing.Context) error {
 		TokenType:       excelParam.TokenType,
 		ContractAddress: excelParam.ContractAddress,
 		EventType:       excelParam.EventType,
+		NetType:         param.NetType,
 	}
 
 	if err := updateExcelParam(mgr, param2); err != SUCCESS {
@@ -256,7 +257,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 	}
-	fee, err := mgr.EstimateFee(mgr.GetNetType(), mgr.GetTotal())
+	fee, err := mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
 	if err != nil {
 		log.Errorf("EstimateFee error: %s", err)
 		return writeResponse(ctx, ResponsePack(EstimateFeeError))

@@ -267,15 +267,15 @@ func (this *BonusDB) QueryTxInfoByEventType(netty, eventType string, start, end 
 	var strSql string
 	if netty == config.MainNet {
 		if start == 0 && end == 0 {
-			strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?"
 		} else {
-			strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? order by id DESC limit ?, ?"
 		}
 	} else {
 		if start == 0 && end == 0 {
-			strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ?"
 		} else {
-			strSql = "select Id, TokenType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ? order by id DESC limit ?, ?"
 		}
 	}
 	stmt, err := this.db.Prepare(strSql)
@@ -299,17 +299,18 @@ func (this *BonusDB) QueryTxInfoByEventType(netty, eventType string, start, end 
 	}
 	res := make([]*common.TransactionInfo, 0)
 	for rows.Next() {
-		var txHash, tokenType, contractAddress, address, amount, errorDetail string
+		var txHash, tokenType, netty, contractAddress, address, amount, errorDetail string
 		var txResult byte
 		var txTime uint32
 		var id int
-		if err = rows.Scan(&id, &tokenType, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
+		if err = rows.Scan(&id, &tokenType, &netty, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
 			return nil, err
 		}
 		res = append(res, &common.TransactionInfo{
 			Id:              id,
 			EventType:       eventType,
 			TokenType:       tokenType,
+			NetType:         netty,
 			ContractAddress: contractAddress,
 			Address:         address,
 			Amount:          amount,

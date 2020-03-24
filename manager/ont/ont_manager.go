@@ -3,6 +3,12 @@ package ont
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	"github.com/ontio/bonus/bonus_db"
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
@@ -14,11 +20,6 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
-	"io/ioutil"
-	"math/big"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 var OntIDVersion = byte(0)

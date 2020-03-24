@@ -3,12 +3,13 @@ package restful
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
-	"strconv"
-	"strings"
 )
 
 type QueryTxInfoParam struct {

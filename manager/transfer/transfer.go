@@ -1,15 +1,16 @@
 package transfer
 
 import (
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/interfaces"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
-	"strings"
-	"sync"
-	"time"
 )
 
 type TxHandleTask struct {

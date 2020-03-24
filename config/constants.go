@@ -13,11 +13,6 @@ const (
 )
 
 const (
-	KEY_EVT_TY    = "key_evt_ty"
-	KEY_GAS_PRICE = "key_gas_price"
-)
-
-const (
 	ONT   = "ONT"
 	ONG   = "ONG"
 	OEP4  = "OEP4"

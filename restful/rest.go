@@ -1,10 +1,11 @@
 package restful
 
 import (
+	"strconv"
+
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
 	"github.com/valyala/fasthttp"
-	"strconv"
 )
 
 func StartServer() error {

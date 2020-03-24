@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/ontio/bonus/cmd"
-	"github.com/ontio/bonus/config"
-	"github.com/ontio/bonus/ledger"
-	"github.com/ontio/bonus/manager/interfaces"
-	"github.com/ontio/bonus/restful"
-	"github.com/ontio/ontology/common/log"
-	"github.com/urfave/cli"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/ontio/bonus/cmd"
+	"github.com/ontio/bonus/config"
+	"github.com/ontio/bonus/manager/interfaces"
+	"github.com/ontio/bonus/restful"
+	"github.com/ontio/ontology/common/log"
+	"github.com/urfave/cli"
 )
 
 func setupAPP() *cli.App {

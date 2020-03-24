@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
-	"github.com/ontio/bonus/utils"
-	"github.com/ontio/ontology/common/log"
 	"io/ioutil"
 	"math/big"
 	"path/filepath"
 	"strings"
+
+	"github.com/ontio/bonus/utils"
+	"github.com/ontio/ontology/common/log"
 )
 
 var Version = ""
@@ -51,12 +52,12 @@ const (
 )
 
 var (
-	DEFAULT_LOG_LEVEL           = log.InfoLog
-	DEFAULT_REST_PORT           = uint(8080)
+	DEFAULT_LOG_LEVEL = log.InfoLog
+	DEFAULT_REST_PORT = uint(8080)
 
-	ONT_TRANSFER_QUEUE_SIZE  = 100
-	ETH_TRANSFER_QUEUE_SIZE  = 20
-	All_TOKEN_TYPE           []string //need init when server start, //TODO
+	ONT_TRANSFER_QUEUE_SIZE = 100
+	ETH_TRANSFER_QUEUE_SIZE = 20
+	All_TOKEN_TYPE          []string //need init when server start, //TODO
 )
 
 type Ont struct {

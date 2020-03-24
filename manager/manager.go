@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"

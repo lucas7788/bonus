@@ -1,14 +1,16 @@
 package eth
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
-	"bytes"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -27,7 +29,6 @@ import (
 	"github.com/ontio/bonus/utils"
 	common3 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
-	"path/filepath"
 )
 
 var (
@@ -43,6 +44,12 @@ type Token struct {
 }
 
 type EthManager struct {
+	// persisted
+	cfg     *config.Eth
+	excel   *common2.ExcelParam
+	netType string
+	db      *bonus_db.BonusDB
+
 	keyStore     *keystore.KeyStore
 	account      accounts.Account
 	ethClient    *ethclient.Client
@@ -51,16 +58,6 @@ type EthManager struct {
 	Erc20Abi     abi.ABI
 	nonce        uint64
 	txHandleTask *transfer.TxHandleTask
-	cfg          *config.Eth
-	lock         sync.RWMutex
-	eatp         *common2.ExcelParam
-	netType      string
-	db           *bonus_db.BonusDB
-	gasPrice     *big.Int
-}
-
-func (this *EthManager) GetExcelParam() *common2.ExcelParam {
-	return this.eatp
 }
 
 func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*EthManager, error) {
@@ -84,14 +81,14 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 	if err != nil {
 		return nil, err
 	}
-	err = common2.CheckPath(cfg.KeyStore)
+	err = common2.CheckPath(cfg.WorkingPath)
 	if err != nil {
 		return nil, err
 	}
-	if cfg.KeyStore == "" {
-		cfg.KeyStore = filepath.Join(config.DefaultWalletPath, "eth")
+	if cfg.WorkingPath == "" {
+		cfg.WorkingPath = config.GetEventDir(eatp.TokenType, eatp.EventType)
 	}
-	walletPath := filepath.Join(cfg.KeyStore, "eth_"+eatp.EventType)
+	walletPath := filepath.Join(cfg.WorkingPath, "eth_"+netType)
 	log.Infof("eth wallet path: %s", walletPath)
 
 	keyStore := keystore.NewKeyStore(walletPath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -113,10 +110,9 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		keyStore:     keyStore,
 		cfg:          cfg,
 		txTimeClient: c,
-		eatp:         eatp,
+		excel:        eatp,
 		netType:      netType,
 		db:           db,
-		gasPrice:     DEFAULT_GAS_PRICE,
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -130,6 +126,12 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 	if err != nil {
 		return nil, fmt.Errorf("NewEthManager: parse erc20 abi failed, %s", err)
 	}
+
+	if mgr.excel.ContractAddress != "" {
+		if err := mgr.updateContractInfo(mgr.excel.ContractAddress); err != nil {
+			return nil, fmt.Errorf("update contract info: %s", err)
+		}
+	}
 	return mgr, nil
 }
 
@@ -142,28 +144,68 @@ func parseGweiToGasPrice(gasPrice int) *big.Int {
 	return new(big.Int).Mul(temp, OneGwei)
 }
 
-func (this *EthManager) InsertExcelSql() error {
-	return this.db.InsertExcelSql(this.eatp)
+type EthPersistHelper struct {
+	Config  *config.Eth         `json:"config"`
+	Request *common2.ExcelParam `json:"request"`
 }
+
+func (this *EthManager) Store() error {
+	helper := &EthPersistHelper{
+		Config:  this.cfg,
+		Request: this.excel,
+	}
+	data, err := json.Marshal(helper)
+	if err != nil {
+		return err
+	}
+	configFilename := filepath.Join(config.GetEventDir(this.excel.TokenType, this.excel.EventType), "config.json")
+	if err := ioutil.WriteFile(configFilename, data, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadEthManager(tokenType, eventType string) (*config.Eth, *common2.ExcelParam, error) {
+	configFilename := filepath.Join(config.GetEventDir(tokenType, eventType), "config.json")
+	data, err := ioutil.ReadFile(configFilename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	helper := &EthPersistHelper{}
+	if err := json.Unmarshal(data, helper); err != nil {
+		return nil, nil, err
+	}
+	return helper.Config, helper.Request, nil
+}
+
 func (this *EthManager) QueryTransferProgress() (map[string]int, error) {
-	return this.db.QueryTransferProgress(this.eatp.EventType, this.eatp.NetType)
+	return this.db.QueryTransferProgress(this.excel.EventType, this.excel.NetType)
 }
-func (this EthManager) GetDB() *bonus_db.BonusDB {
-	return this.db
-}
+
 func (this *EthManager) CloseDB() {
 	this.db.Close()
 }
-func (this *EthManager) SetGasPrice(gasPrice int) {
-	this.gasPrice = parseGweiToGasPrice(gasPrice)
+func (this *EthManager) SetGasPrice(gasPrice uint64) error {
+	this.cfg.GasPrice = gasPrice
+	// FIXME: update fee-estimate
+	return this.Store()
 }
 
-func (this *EthManager) GetGasPrice() int {
-	return parseGasPriceToGwei(this.gasPrice)
+func (this *EthManager) GetGasPrice() uint64 {
+	return this.cfg.GasPrice
 }
 
 func (self *EthManager) GetNetType() string {
 	return self.netType
+}
+
+func (this *EthManager) GetExcelParam() *common2.ExcelParam {
+	return this.excel
+}
+
+func (self *EthManager) QueryTxInfo(start, end int) ([]*common2.TransactionInfo, error) {
+	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end)
 }
 
 func (self *EthManager) VerifyAddress(address string) bool {
@@ -181,16 +223,16 @@ func (self *EthManager) GetAdminAddress() string {
 
 func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 	res := make(map[string]string)
-	if self.eatp.TokenType == config.ERC20 {
-		erc20, ok := self.tokens[self.eatp.ContractAddress]
+	if self.excel.TokenType == config.ERC20 {
+		erc20, ok := self.tokens[self.excel.ContractAddress]
 		if !ok || erc20 == nil {
-			return nil, fmt.Errorf("Withdraw: token %s not exist", self.eatp.ContractAddress)
+			return nil, fmt.Errorf("Withdraw: token %s not exist", self.excel.ContractAddress)
 		}
 		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
 		if err != nil {
-			return nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.eatp.ContractAddress, err)
+			return nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
 		}
-		res[self.eatp.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
+		res[self.excel.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
 
 	}
 	ethBalance, err := self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
@@ -202,7 +244,7 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 }
 
 func (self *EthManager) EstimateFee(tokenType string, total int) (string, error) {
-	contractAddr := ethComm.HexToAddress(self.eatp.ContractAddress)
+	contractAddr := ethComm.HexToAddress(self.excel.ContractAddress)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	// TODO: FIX HERE
@@ -218,31 +260,32 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 }
 
 func (this *EthManager) GetTotal() int {
-	return len(this.eatp.BillList)
+	return len(this.excel.BillList)
 }
 
 func (self *EthManager) ComputeSum() (string, error) {
-	if self.eatp.TokenType == config.ERC20 {
+	// TODO: SUPPORT ETH
+	if self.excel.TokenType == config.ERC20 {
 		sum := new(big.Int)
-		for _, item := range self.eatp.BillList {
-			val := utils.ToIntByPrecise(item.Amount, self.tokens[self.eatp.ContractAddress].Decimals)
+		for _, item := range self.excel.BillList {
+			val := utils.ToIntByPrecise(item.Amount, self.tokens[self.excel.ContractAddress].Decimals)
 			sum = sum.Add(sum, val)
 		}
-		return utils.ToStringByPrecise(sum, self.tokens[self.eatp.ContractAddress].Decimals), nil
+		return utils.ToStringByPrecise(sum, self.tokens[self.excel.ContractAddress].Decimals), nil
 	}
-	return "", fmt.Errorf("not supported token type: %s", self.eatp.TokenType)
+	return "", fmt.Errorf("not supported token type: %s", self.excel.TokenType)
 }
 
 func (self *EthManager) WithdrawToken(address, tokenType string) error {
-	ba, err := self.GetAdminBalance()
+	allBalances, err := self.GetAdminBalance()
 	if err != nil {
 		return err
 	}
 	var amt string
 	if tokenType == config.ERC20 {
-		amt = ba[config.ERC20]
+		amt = allBalances[config.ERC20]
 	} else if tokenType == config.ETH {
-		ba := ba[config.ETH]
+		ba := allBalances[config.ETH]
 		baBig := utils.ToIntByPrecise(ba, config.ETH_DECIMALS)
 		feeStr, err := self.EstimateFee(config.ETH, 1)
 		if err != nil {
@@ -273,29 +316,29 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 	return nil
 }
 
-func (this *EthManager) SetContractAddress(address string) error {
+func (this *EthManager) updateContractInfo(address string) error {
 	contractAddr := ethComm.HexToAddress(address)
 	erc20, err := NewErc20(contractAddr, this.ethClient)
 	if err != nil {
-		return fmt.Errorf("NewEthManager: new erc20 contract failed, token %s, err: %s", this.eatp.ContractAddress, err)
+		return fmt.Errorf("NewEthManager: new erc20 contract failed, token %s, err: %s", this.excel.ContractAddress, err)
 	}
 	decimals, err := erc20.Decimals(&bind.CallOpts{})
 	if err != nil {
-		return fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", this.eatp.ContractAddress, err)
+		return fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", this.excel.ContractAddress, err)
 	}
-	this.tokens[this.eatp.ContractAddress] = &Token{ContractAddr: contractAddr, Decimals: decimals.Uint64(), Contract: erc20}
+	this.tokens[this.excel.ContractAddress] = &Token{ContractAddr: contractAddr, Decimals: decimals.Uint64(), Contract: erc20}
 	return nil
 }
 
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		err := self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
+		err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
 		if err != nil {
 			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
 			return
 		}
-		for _, trParam := range self.eatp.BillList {
+		for _, trParam := range self.excel.BillList {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
@@ -315,8 +358,8 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 
 func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
-	self.txHandleTask = transfer.NewTxHandleTask(self.eatp.TokenType, self.db)
-	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
+	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
+	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 
@@ -335,30 +378,30 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
 			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
 	}
-	if (this.eatp.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
+	if (this.excel.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
 		withdrawAmount := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
 		if ethBalance.Cmp(withdrawAmount) < 0 {
 			return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
 				utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
 		}
-		log.Debugf("Withdraw: %s, pending balance is %s", this.eatp.TokenType,
+		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.TokenType,
 			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
 		return this.newWithdrawEthTx(to, withdrawAmount, DEFAULT_GAS_PRICE)
 	} else {
-		erc20, ok := this.tokens[this.eatp.ContractAddress]
+		erc20, ok := this.tokens[this.excel.ContractAddress]
 		if !ok {
-			return "", nil, fmt.Errorf("Withdraw: token %s not exist", this.eatp.ContractAddress)
+			return "", nil, fmt.Errorf("Withdraw: token %s not exist", this.excel.ContractAddress)
 		}
 		withdrawAmount := utils.ToIntByPrecise(amount, erc20.Decimals)
 		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, this.account.Address)
 		if err != nil {
-			return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.eatp.ContractAddress, err)
+			return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.excel.ContractAddress, err)
 		}
 		if balance.Cmp(withdrawAmount) < 0 {
 			return "", nil, fmt.Errorf("Withdraw: self pending balance %s not enough, token %s",
-				utils.ToStringByPrecise(balance, erc20.Decimals), this.eatp.ContractAddress)
+				utils.ToStringByPrecise(balance, erc20.Decimals), this.excel.ContractAddress)
 		}
-		log.Debugf("Withdraw: %s, pending balance is %s", this.eatp.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
+		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
 		return this.newWithdrawErc20Tx(erc20.ContractAddr, to, withdrawAmount, DEFAULT_GAS_PRICE)
 	}
 }

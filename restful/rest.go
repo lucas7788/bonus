@@ -7,7 +7,10 @@ import (
 	"strconv"
 )
 
-func StartServer() {
+func StartServer() error {
+	if err := loadAllHistoryEvents(); err != nil {
+		return err
+	}
 	go func() {
 		router := InitRouter()
 		port := strconv.Itoa(int(config.DefConfig.RestPort))
@@ -23,4 +26,5 @@ func StartServer() {
 			log.Errorf("ListenAndServe error: %s\n", err)
 		}
 	}()
+	return nil
 }

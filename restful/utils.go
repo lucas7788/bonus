@@ -2,6 +2,7 @@ package restful
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
@@ -41,9 +42,9 @@ func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
 
 type QueryExcelParam struct {
 	EvtType  string
+	NetType  string
 	PageNum  int
 	PageSize int
-	NetType  string
 }
 
 func ParseQueryExcelParam(ctx *routing.Context) (*QueryExcelParam, int64) {
@@ -88,6 +89,7 @@ func ParseTransferParam(ctx *routing.Context) (evtType string, netType string, e
 	if !ok {
 		return "", "", PARA_ERROR
 	}
+	// TODO: validate params
 	return evtType, netType, SUCCESS
 }
 
@@ -127,6 +129,12 @@ func ParseWithdrawParam(ctx *routing.Context) (*common.WithdrawParam, int64) {
 	netTy, ok := netType.(string)
 	if !ok {
 		return nil, PARA_ERROR
+	}
+	if evtType == "" || netTy == "" || tokenTy == "" || addr == "" {
+		return nil, PARA_ERROR
+	}
+	if !common.IsTokenTypeSupported(tokenTy) {
+		return nil, NotSupportTokenType
 	}
 	return &common.WithdrawParam{
 		EventType: evtType,
@@ -210,14 +218,6 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, string, int64) {
 		log.Errorf("contractAddress error\n")
 		return nil, "", PARA_ERROR
 	}
-	if tokenType == config.ERC20 && contractAddress == "" {
-		log.Errorf("tokenType == config.ERC20 and contractAddress is nil\n")
-		return nil, "", PARA_ERROR
-	}
-	if tokenType == config.OEP4 && contractAddress == "" {
-		log.Errorf("param error\n")
-		return nil, "", PARA_ERROR
-	}
 	eventType, ok := param["eventType"].(string)
 	if !ok || eventType == "" {
 		log.Errorf("eventType is nil\n")
@@ -262,12 +262,36 @@ func ParseExcelParam(ctx *routing.Context) (*common.ExcelParam, string, int64) {
 		}
 		transferParam = append(transferParam, tp)
 	}
-	return &common.ExcelParam{
+	excel := &common.ExcelParam{
 		BillList:        transferParam,
 		TokenType:       tokenType,
 		ContractAddress: contractAddress,
 		EventType:       eventType,
-	}, netType, SUCCESS
+	}
+
+	if err := ValidateExcelParam(excel); err != nil {
+		log.Infof("invalid excel param: %s", err)
+		return nil, "", PARA_ERROR
+	}
+
+	return excel, netType, SUCCESS
+}
+
+func ValidateExcelParam(excel *common.ExcelParam) error {
+	if excel.NetType != config.MainNet && excel.NetType != config.TestNet {
+		return fmt.Errorf("invalid net type: %s", excel.NetType)
+	}
+	if !common.IsTokenTypeSupported(excel.TokenType) {
+		return fmt.Errorf("invalid toke type: %s", excel.TokenType)
+	}
+	if excel.TokenType == config.ERC20 && excel.ContractAddress == "" {
+		return fmt.Errorf("tokenType == config.ERC20 and contractAddress is nil")
+	}
+	if excel.TokenType == config.OEP4 && excel.ContractAddress == "" {
+		return fmt.Errorf("tokenType == config.OEP4 and contractAddress is nil")
+	}
+
+	return nil
 }
 
 func ParseTxInfoToEatp(txInfo []*common.TransactionInfo) *common.ExcelParam {

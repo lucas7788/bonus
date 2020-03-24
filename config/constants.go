@@ -32,3 +32,7 @@ const (
 	EthSleepTime  = 6
 	PendingLimit  = 100
 )
+
+var (
+	SupportedTokenTypes = []string{ONT, ONG, OEP4, ETH, ERC20}
+)

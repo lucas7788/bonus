@@ -42,27 +42,16 @@ func main() {
 func startBonus(ctx *cli.Context) {
 	initLog(ctx)
 	log.Infof("ontology version %s", config.Version)
-	err := initConfig(ctx)
-	if err != nil {
+
+	if err := initConfig(ctx); err != nil {
 		log.Errorf("initConfig error: %s", err)
 		return
 	}
-	err = initDB(ctx)
-	if err != nil {
-		log.Errorf("initDB error: %s", err)
+	if err := restful.StartServer(); err != nil {
+		log.Errorf("start web server: %s", err)
 		return
 	}
-	restful.StartServer()
 	waitToExit()
-}
-
-func initDB(ctx *cli.Context) error {
-	var err error
-	ledger.DefBonusLedger, err = ledger.NewBonusLedger()
-	if err != nil {
-		return fmt.Errorf("[initDB]NewBonusLedger error: %s", err)
-	}
-	return nil
 }
 
 func initLog(ctx *cli.Context) {
@@ -83,7 +72,6 @@ func waitToExit() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
 		for sig := range sc {
-			ledger.DefBonusLedger.Close()
 			restful.DefBonusMap.Range(func(key, value interface{}) bool {
 				mgr, _ := value.(interfaces.WithdrawManager)
 				mgr.CloseDB()

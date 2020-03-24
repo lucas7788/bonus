@@ -1,7 +1,6 @@
 package interfaces
 
 import (
-	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 )
 
@@ -9,7 +8,6 @@ type WithdrawManager interface {
 	NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error)
 	SendTx(txHex []byte) (string, error)
 	VerifyTx(txHash string, retryLimit int) (bool, error)
-	SetContractAddress(address string) error
 	StartTransfer()
 	StartHandleTxTask()
 	GetAdminAddress() string
@@ -23,9 +21,10 @@ type WithdrawManager interface {
 	GetNetType() string
 	GetTotal() int
 	GetExcelParam() *common.ExcelParam
-	InsertExcelSql() error
+	Store() error
 	CloseDB()
-	GetDB() *bonus_db.BonusDB
-	SetGasPrice(gasPrice int)
-	GetGasPrice() int
+	QueryTransferProgress() (map[string]int, error)
+	QueryTxInfo(start, end int) ([]*common.TransactionInfo, error)
+	SetGasPrice(gasPrice uint64) error
+	GetGasPrice() uint64
 }

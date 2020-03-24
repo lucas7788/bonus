@@ -3,15 +3,20 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ontio/bonus/config"
-	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
+
+	"github.com/ontio/bonus/config"
+	"github.com/urfave/cli"
 )
 
 const config_file = "./config.json"
 
 func SetOntologyConfig(ctx *cli.Context) error {
+	if _, err := os.Stat(config_file); os.IsNotExist(err) {
+		// if there's no config file, use default config
+		return nil
+	}
 	file, err := os.Open(config_file)
 	if err != nil {
 		return err

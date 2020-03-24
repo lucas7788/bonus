@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/ontio/bonus/config"
 )
 
 func IsHave(allStr []string, item string) bool {
@@ -31,4 +33,19 @@ func CheckPath(path string) error {
 	}
 
 	return nil
+}
+
+func (param *ExcelParam) ResetTransferListID() {
+	for id, b := range param.BillList {
+		b.Id = id
+	}
+}
+
+func IsTokenTypeSupported(token string) bool {
+	for _, t := range config.SupportedTokenTypes {
+		if token == t {
+			return true
+		}
+	}
+	return false
 }

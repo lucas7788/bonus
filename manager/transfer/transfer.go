@@ -23,6 +23,7 @@ type TxHandleTask struct {
 	TransferStatus     common.TransferStatus
 	TokenType          string
 	db                 *bonus_db.BonusDB
+	netTy              string
 }
 
 type VerifyParam struct {
@@ -32,7 +33,7 @@ type VerifyParam struct {
 	Address   string
 }
 
-func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *TxHandleTask {
+func NewTxHandleTask(netty, tokenType string, db *bonus_db.BonusDB, txQueueSize int) *TxHandleTask {
 	transferQueue := make(chan *common.TransferParam, txQueueSize)
 	verifyQueue := make(chan *VerifyParam, txQueueSize/2)
 	return &TxHandleTask{
@@ -43,6 +44,7 @@ func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *T
 		waitVerify:     make(chan bool),
 		TokenType:      tokenType,
 		db:             db,
+		netTy:          netty,
 	}
 }
 
@@ -50,7 +52,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 	txInfos := make([]*common.TransactionInfo, 0)
 	//update tx info table
 	for _, trParam := range eatp.BillList {
-		tx, err := this.db.QueryTxHexByExcelAndAddr(eatp.EventType, trParam.Address, trParam.Id)
+		tx, err := this.db.QueryTxHexByExcelAndAddr(eatp.NetType, eatp.EventType, trParam.Address, trParam.Id)
 		if err != nil {
 			log.Errorf("QueryTxHexByExcelAndAddr error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)
 			continue
@@ -101,7 +103,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			}
 			var txHex []byte
 			var err error
-			txInfo, err := self.db.QueryTxHexByExcelAndAddr(eventType, param.Address, param.Id)
+			txInfo, err := self.db.QueryTxHexByExcelAndAddr(self.netTy, eventType, param.Address, param.Id)
 			if err != nil {
 				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
 				continue
@@ -115,7 +117,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				(txInfo != nil && txInfo.TxResult == common.OneTransfering && txInfo.TxHash != "") ||
 				(txInfo != nil && txInfo.TxResult == common.SendFailed && txInfo.TxHash != "") {
 
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.OneTransfering, 0, "")
+				err = self.db.UpdateTxResult(self.netTy, eventType, param.Address, param.Id, common.OneTransfering, 0, "")
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
 						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
@@ -129,7 +131,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 						log.Errorf("GetTxTime error: %s", err)
 						continue
 					}
-					err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.TxSuccess, ti, "")
+					err = self.db.UpdateTxResult(self.netTy, eventType, param.Address, param.Id, common.TxSuccess, ti, "")
 					if err != nil {
 						log.Errorf("UpdateTxResult failed, txhash: %s, error: %s", txInfo.TxHash, err)
 					}
@@ -151,14 +153,14 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				txHash, txHex, err = mana.NewWithdrawTx(param.Address, param.Amount, "")
 				if err != nil || txHash == "" || txHex == nil {
 					log.Errorf("Build Transfer Tx failed,address: %s,txHash: %s, err: %s", param.Address, txHash, err)
-					err := self.db.UpdateTxResult(eventType, param.Address, param.Id, common.BuildTxFailed, 0, err.Error())
+					err := self.db.UpdateTxResult(self.netTy, eventType, param.Address, param.Id, common.BuildTxFailed, 0, err.Error())
 					if err != nil {
 						log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s", err, eventType, param.Address)
 					}
 					continue
 				}
 				log.Debugf("tx build success, txhash: %s", txHash)
-				err := self.db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.OneTransfering, eventType, param.Address, param.Id)
+				err := self.db.UpdateTxInfo(self.netTy, txHash, common2.ToHexString(txHex), common.OneTransfering, eventType, param.Address, param.Id)
 				if err != nil {
 					log.Errorf("UpdateTxInfo error: %s, event type:%s, address: %s", err, eventType, param.Address)
 					continue
@@ -189,7 +191,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			if err != nil || hash == "" {
 				log.Errorf("SendTx error: %s, txhash: %s", err, hash)
 				//save txHex
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.SendFailed, 00, err.Error())
+				err = self.db.UpdateTxResult(self.netTy, eventType, param.Address, param.Id, common.SendFailed, 00, err.Error())
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, txHash: %s, txresult: %d",
 						err, eventType, param.Address, txInfo.TxHash, byte(common.SendFailed))
@@ -197,7 +199,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				continue
 			} else {
 				//save txHex
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.OneTransfering, 0, "")
+				err = self.db.UpdateTxResult(self.netTy, eventType, param.Address, param.Id, common.OneTransfering, 0, "")
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
 						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
@@ -228,7 +230,7 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 			boo, err := mana.VerifyTx(verifyParam.TxHash, config.RetryLimit)
 			if !boo {
 				//save failed tx to bonus_db
-				err := self.db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxFailed, 0, err.Error())
+				err := self.db.UpdateTxResult(self.netTy, verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxFailed, 0, err.Error())
 				if err != nil {
 					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
 				}
@@ -241,7 +243,7 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 				continue
 			}
 			//update bonus_db
-			err = self.db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxSuccess, ti, "success")
+			err = self.db.UpdateTxResult(self.netTy, verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxSuccess, ti, "success")
 			if err != nil {
 				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
 			}

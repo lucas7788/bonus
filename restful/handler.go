@@ -17,12 +17,12 @@ import (
 var DefBonusMap = new(sync.Map) // tokentype + event-name -> withdraw-mgr
 
 func UploadExcel(ctx *routing.Context) error {
-	excelParam, _, errCode := ParseExcelParam(ctx)
+	excelParam, errCode := ParseExcelParam(ctx)
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 
-	eventName := excelParam.EventType + excelParam.NetType
+	eventName := excelParam.TokenType + "_" + excelParam.EventType
 	if _, exist := DefBonusMap.Load(eventName); exist {
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
@@ -46,7 +46,7 @@ func UploadExcel(ctx *routing.Context) error {
 		log.Errorf("Store error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
-
+	DefBonusMap.Store(eventName, nil)
 	DefBonusMap.Store(config.GetEventDir(excelParam.TokenType, excelParam.EventType), mgr)
 	return writeResponse(ctx, ResponseSuccess(excelParam))
 }
@@ -205,13 +205,23 @@ func GetExcelParamByEvtType(ctx *routing.Context) error {
 		EventType:       excelParam.EventType,
 	}
 
+	if err := updateExcelParam(mgr, param2); err != SUCCESS {
+		log.Errorf("[GetExcelParamByEvtType]updateExcelParam error: %d", err)
+		return writeResponse(ctx, ResponsePack(err))
+	}
 	if param.PageSize != 0 {
 		if param.PageNum <= 0 {
 			param.PageNum = 1
 		}
 		start := (param.PageNum - 1) * param.PageSize
 		end := start + param.PageSize
-		param2.BillList = excelParam.BillList[start:end]
+		if start > len(excelParam.BillList) {
+			param2.BillList = nil
+		} else if end > len(excelParam.BillList) {
+			param2.BillList = excelParam.BillList[start:]
+		} else {
+			param2.BillList = excelParam.BillList[start:end]
+		}
 	}
 	return writeResponse(ctx, ResponseSuccess(param2))
 }
@@ -246,7 +256,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 	}
-	fee, err := mgr.EstimateFee("", mgr.GetTotal())
+	fee, err := mgr.EstimateFee(mgr.GetNetType(), mgr.GetTotal())
 	if err != nil {
 		log.Errorf("EstimateFee error: %s", err)
 		return writeResponse(ctx, ResponsePack(EstimateFeeError))
@@ -280,7 +290,7 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 		log.Errorf("GetAdminBalance error: %s", err)
 		return GetAdminBalanceError
 	}
-	excelParam.EstimateFee, err = mgr.EstimateFee("", mgr.GetTotal())
+	excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
 	if err != nil {
 		log.Errorf("EstimateFee error: %s", err)
 		return EstimateFeeError
@@ -310,19 +320,23 @@ func loadAllHistoryEvents() error {
 func getTokenManager(eventType, netType string) (interfaces.WithdrawManager, int64) {
 	tokenType := ""
 	for _, t := range config.SupportedTokenTypes {
-		if mn, present := DefBonusMap.Load(config.GetEventDir(t, eventType)); present && mn != nil {
-			mgr, ok := mn.(interfaces.WithdrawManager)
-			if !ok {
-				return nil, TypeTransferError
-			}
-			return mgr, SUCCESS
-		} else if present && mn == nil {
+		eventName := t + "_" + eventType
+		if _, exist := DefBonusMap.Load(eventName); exist {
 			tokenType = t
 			break
 		}
+
 	}
 	if tokenType == "" {
 		return nil, NoTheEventTypeError
+	}
+
+	if mn, present := DefBonusMap.Load(config.GetEventDir(tokenType, eventType)); present && mn != nil {
+		mgr, ok := mn.(interfaces.WithdrawManager)
+		if !ok {
+			return nil, TypeTransferError
+		}
+		return mgr, SUCCESS
 	}
 
 	mgr, err := manager.RecoverManager(tokenType, eventType, netType)

@@ -13,7 +13,7 @@ func init() {
 
 }
 func TestInsertSql(t *testing.T) {
-	db, err := NewBonusDB()
+	db, err := NewBonusDB("eventType", "netType", true)
 	if err != nil {
 		fmt.Println("err:", err)
 		return

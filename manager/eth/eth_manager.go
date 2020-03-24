@@ -88,7 +88,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 	if cfg.WorkingPath == "" {
 		cfg.WorkingPath = config.GetEventDir(eatp.TokenType, eatp.EventType)
 	}
-	walletPath := filepath.Join(cfg.WorkingPath, "eth_"+netType)
+	walletPath := filepath.Join(cfg.WorkingPath, "eth_"+eatp.EventType)
 	log.Infof("eth wallet path: %s", walletPath)
 
 	keyStore := keystore.NewKeyStore(walletPath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -180,7 +180,7 @@ func LoadEthManager(tokenType, eventType string) (*config.Eth, *common2.ExcelPar
 }
 
 func (this *EthManager) QueryTransferProgress() (map[string]int, error) {
-	return this.db.QueryTransferProgress(this.excel.EventType, this.excel.NetType)
+	return this.db.QueryTransferProgress(this.netType, this.excel.EventType, this.excel.NetType)
 }
 
 func (this *EthManager) CloseDB() {
@@ -205,7 +205,7 @@ func (this *EthManager) GetExcelParam() *common2.ExcelParam {
 }
 
 func (self *EthManager) QueryTxInfo(start, end int) ([]*common2.TransactionInfo, error) {
-	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end)
+	return self.db.QueryTxInfoByEventType(self.netType, self.excel.EventType, start, end)
 }
 
 func (self *EthManager) VerifyAddress(address string) bool {
@@ -358,7 +358,7 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 
 func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
-	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
+	self.txHandleTask = transfer.NewTxHandleTask(self.netType, self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
 	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
@@ -546,7 +546,7 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 }
 
 func (this *EthManager) reSendTx(txHash string) {
-	txInfo, err := this.db.QueryTxHexByTxHash(txHash)
+	txInfo, err := this.db.QueryTxHexByTxHash(this.netType, txHash)
 	if err != nil {
 		log.Errorf("[reSendTx] QueryTxHexByTxHash error:%s", err)
 		return

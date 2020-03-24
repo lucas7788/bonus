@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/ontio/bonus/cmd"
+	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/bonus/restful"
@@ -41,7 +42,14 @@ func main() {
 
 func startBonus(ctx *cli.Context) {
 	initLog(ctx)
-	log.Infof("ontology version %s", config.Version)
+	log.Infof("bonus version %s", config.Version)
+	if !common.PathExists(config.DBPath) {
+		err := os.Mkdir(config.DBPath, os.ModePerm)
+		if err != nil {
+			log.Errorf("Mkdir error: %s", err)
+			return
+		}
+	}
 
 	if err := initConfig(ctx); err != nil {
 		log.Errorf("initConfig error: %s", err)
@@ -73,8 +81,10 @@ func waitToExit() {
 	go func() {
 		for sig := range sc {
 			restful.DefBonusMap.Range(func(key, value interface{}) bool {
-				mgr, _ := value.(interfaces.WithdrawManager)
-				mgr.CloseDB()
+				mgr, ok := value.(interfaces.WithdrawManager)
+				if ok {
+					mgr.CloseDB()
+				}
 				return true
 			})
 			log.Infof("bonus server received exit signal: %s.", sig.String())

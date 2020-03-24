@@ -1,13 +1,17 @@
 package restful
 
 import (
+	"strconv"
+
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
 	"github.com/valyala/fasthttp"
-	"strconv"
 )
 
-func StartServer() {
+func StartServer() error {
+	if err := loadAllHistoryEvents(); err != nil {
+		return err
+	}
 	go func() {
 		router := InitRouter()
 		port := strconv.Itoa(int(config.DefConfig.RestPort))
@@ -23,4 +27,5 @@ func StartServer() {
 			log.Errorf("ListenAndServe error: %s\n", err)
 		}
 	}()
+	return nil
 }

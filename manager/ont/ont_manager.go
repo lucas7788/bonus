@@ -1,7 +1,14 @@
 package ont
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	"github.com/ontio/bonus/bonus_db"
 	common2 "github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
@@ -13,26 +20,23 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
-	"math/big"
-	"os"
-	"strconv"
-	"time"
 )
 
 var OntIDVersion = byte(0)
 
 type OntManager struct {
+	// persisted
+	cfg     *config.Ont
+	excel   *common2.ExcelParam
+	netType string
+	db      *bonus_db.BonusDB
+
+	// loaded
 	account         *sdk.Account
 	ontSdk          *sdk.OntologySdk
 	contractAddress common.Address
-	cfg             *config.Ont
-	ipIndex         int
-	precision       int
+	decimals        int
 	txHandleTask    *transfer.TxHandleTask
-	eatp            *common2.ExcelParam
-	netType         string
-	db              *bonus_db.BonusDB
-	gasPrice        int
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*OntManager, error) {
@@ -46,16 +50,16 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	}
 	ontSdk := sdk.NewOntologySdk()
 	ontSdk.NewRpcClient().SetAddress(rpcAddr)
-	if cfg.WalletFile == "" {
-		cfg.WalletFile = fmt.Sprintf("%s%s%s", config.DefaultWalletPath, string(os.PathSeparator), "ont")
+	if cfg.WorkingPath == "" {
+		cfg.WorkingPath = config.GetEventDir(eatp.TokenType, eatp.EventType)
 	}
-	err := common2.CheckPath(cfg.WalletFile)
+	err := common2.CheckPath(cfg.WorkingPath)
 	if err != nil {
 		return nil, err
 	}
 
-	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.EventType)
-	walletFile := fmt.Sprintf("%s%s%s", cfg.WalletFile, string(os.PathSeparator), walletName)
+	walletName := fmt.Sprintf("%s%s.dat", "ont_", netType)
+	walletFile := filepath.Join(cfg.WorkingPath, walletName)
 	var wallet *sdk.Wallet
 	if !common2.PathExists(walletFile) {
 		wallet, err = ontSdk.CreateWallet(walletFile)
@@ -65,16 +69,18 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	} else {
 		wallet, err = ontSdk.OpenWallet(walletFile)
 		if err != nil {
-			log.Fatalf("Can't open local wallet: %s", err)
-			return nil, fmt.Errorf("password is wrong")
+			return nil, fmt.Errorf("failed to open local wallet %s: %s", walletFile, err)
 		}
 	}
 
 	log.Infof("ont walletFile: %s", walletFile)
 	acct, err := wallet.GetDefaultAccount([]byte(config.PASSWORD))
-	if (err != nil && err.Error() == "does not set default account") || acct == nil {
+	if acct == nil {
 		acct, err = wallet.NewDefaultSettingAccount([]byte(config.PASSWORD))
 		if err != nil {
+			return nil, err
+		}
+		if err := wallet.SetDefaultAccount(acct.Address.ToBase58()); err != nil {
 			return nil, err
 		}
 		err = wallet.Save()
@@ -86,34 +92,73 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 		return nil, err
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
-	ontManager := &OntManager{
-		account:  acct,
-		ontSdk:   ontSdk,
-		cfg:      cfg,
-		eatp:     eatp,
-		netType:  netType,
-		db:       db,
-		gasPrice: int(cfg.GasPrice),
+	mgr := &OntManager{
+		cfg:     cfg,
+		excel:   eatp,
+		netType: netType,
+		db:      db,
+		account: acct,
+		ontSdk:  ontSdk,
 	}
-	return ontManager, nil
-}
-func (this *OntManager) InsertExcelSql() error {
-	return this.db.InsertExcelSql(this.eatp)
-}
-func (this *OntManager) GetDB() *bonus_db.BonusDB {
-	return this.db
-}
-func (this *OntManager) SetGasPrice(gasPrice int) {
-	this.gasPrice = gasPrice
+
+	if mgr.excel.ContractAddress != "" {
+		if err := mgr.updateContractInfo(mgr.excel.ContractAddress); err != nil {
+			return nil, fmt.Errorf("update contract info: %s", err)
+		}
+	}
+
+	return mgr, nil
 }
 
-func (this *OntManager) GetGasPrice() int {
-	return this.gasPrice
+type OntPersistHelper struct {
+	Config  *config.Ont         `json:"config"`
+	Request *common2.ExcelParam `json:"request"`
+}
+
+func (this *OntManager) Store() error {
+	helper := &OntPersistHelper{
+		Config:  this.cfg,
+		Request: this.excel,
+	}
+	data, err := json.Marshal(helper)
+	if err != nil {
+		return err
+	}
+	configFilename := filepath.Join(config.GetEventDir(this.excel.TokenType, this.excel.EventType), "config.json")
+	if err := ioutil.WriteFile(configFilename, data, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadOntManager(tokenType, eventType string) (*config.Ont, *common2.ExcelParam, error) {
+	configFilename := filepath.Join(config.GetEventDir(tokenType, eventType), "config.json")
+	data, err := ioutil.ReadFile(configFilename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	helper := &OntPersistHelper{}
+	if err := json.Unmarshal(data, helper); err != nil {
+		return nil, nil, err
+	}
+	return helper.Config, helper.Request, nil
+}
+
+func (this *OntManager) SetGasPrice(gasPrice uint64) error {
+	this.cfg.GasPrice = gasPrice
+	// FIXME: update fee-estimate
+	return this.Store()
+}
+
+func (this *OntManager) GetGasPrice() uint64 {
+	return this.cfg.GasPrice
 }
 
 func (this *OntManager) QueryTransferProgress() (map[string]int, error) {
-	return this.db.QueryTransferProgress(this.eatp.EventType, this.eatp.NetType)
+	return this.db.QueryTransferProgress(this.excel.EventType, this.excel.NetType)
 }
+
 func (this *OntManager) CloseDB() {
 	this.db.Close()
 }
@@ -122,13 +167,17 @@ func (self *OntManager) GetNetType() string {
 	return self.netType
 }
 func (self *OntManager) GetExcelParam() *common2.ExcelParam {
-	return self.eatp
+	return self.excel
+}
+
+func (self *OntManager) QueryTxInfo(start, end int) ([]*common2.TransactionInfo, error) {
+	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end)
 }
 
 func (self *OntManager) VerifyAddress(address string) bool {
 	_, err := common.AddressFromBase58(address)
 	if err != nil {
-		log.Errorf("ont VerifyAddress failed, address: %s", address)
+		log.Errorf("ont VerifyAddress failed, address: %s, %s", address, err)
 		return false
 	}
 	return true
@@ -137,13 +186,18 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		self.txHandleTask.UpdateTxInfoTable(self, self.eatp)
-		for _, trParam := range self.eatp.BillList {
+		self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		for _, trParam := range self.excel.BillList {
 			if trParam.Amount == "0" {
 				continue
 			}
-			self.txHandleTask.TransferQueue <- trParam
+			select {
+			case self.txHandleTask.TransferQueue <- trParam:
+			case <-self.txHandleTask.CloseChan:
+				break
+			}
 		}
+		// FIXME: remove the close if tx-timeout not handled
 		close(self.txHandleTask.TransferQueue)
 		self.txHandleTask.WaitClose()
 	}()
@@ -151,17 +205,16 @@ func (self *OntManager) StartTransfer() {
 
 func (self *OntManager) GetStatus() common2.TransferStatus {
 	if self.txHandleTask == nil {
-		log.Info("self.txHandleTask is nil")
 		return common2.NotTransfer
 	}
 	return self.txHandleTask.TransferStatus
 }
 
 func (self *OntManager) StartHandleTxTask() {
-	txHandleTask := transfer.NewTxHandleTask(self.eatp.TokenType, self.db)
+	txHandleTask := transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE)
 	self.txHandleTask = txHandleTask
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
-	go self.txHandleTask.StartHandleTransferTask(self, self.eatp.EventType)
+	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
 }
 
@@ -170,23 +223,27 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 	if err != nil {
 		return fmt.Errorf("GetAdminBalance faied, error: %s", err)
 	}
+
+	// check fee
+	fee := new(big.Int).SetUint64(uint64(10000000)) // 0.01
+	ongBalance := utils.ToIntByPrecise(bal[config.ONG], config.ONG_DECIMALS)
+	if ongBalance.Cmp(fee) < 0 {
+		return nil
+	}
+
 	var amt string
-	b := bal[tokenType]
 	if tokenType == config.ONT {
-		amt = b
+		amt = bal[tokenType]
 	} else if tokenType == config.ONG {
-		bigInt := utils.ToIntByPrecise(b, config.ONG_DECIMALS)
-		fee := new(big.Int).SetUint64(uint64(10000000))
-		amtBig := new(big.Int).Sub(bigInt, fee)
+		amtBig := new(big.Int).Sub(ongBalance, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ONG_DECIMALS)
 	} else if tokenType == config.OEP4 {
-		amt = b
+		amt = bal[tokenType]
 	} else {
 		log.Errorf("not support token type: %s", tokenType)
 		return fmt.Errorf("not support token type: %s", tokenType)
 	}
-	self.withdrawToken(address, tokenType, amt)
-	return nil
+	return self.withdrawToken(address, tokenType, amt)
 }
 
 func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
@@ -209,15 +266,12 @@ func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
 	return nil
 }
 
-func (self *OntManager) SetContractAddress(address string) error {
+func (self *OntManager) updateContractInfo(address string) error {
 	addr, err := common.AddressFromHexString(address)
 	if err != nil {
 		return err
 	}
-	self.contractAddress = addr
-	if self.eatp.TokenType == config.OEP5 {
-		return nil
-	}
+
 	//update precision
 	preResult, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(addr,
 		[]interface{}{"decimals", []interface{}{}})
@@ -228,7 +282,8 @@ func (self *OntManager) SetContractAddress(address string) error {
 	if err != nil {
 		return err
 	}
-	self.precision = int(res.Int64())
+	self.decimals = int(res.Int64())
+	self.contractAddress = addr
 	return nil
 }
 
@@ -240,13 +295,13 @@ func (self *OntManager) NewBatchWithdrawTx(addrAndAmts [][]string) (string, []by
 			return "", nil, fmt.Errorf("AddressFromBase58 error: %s", err)
 		}
 		var val *big.Int
-		if self.eatp.TokenType == config.ONT {
+		if self.excel.TokenType == config.ONT {
 			val = utils.ToIntByPrecise(addrAndAmt[1], config.ONT_DECIMALS)
-		} else if self.eatp.TokenType == config.ONG {
+		} else if self.excel.TokenType == config.ONG {
 			val = utils.ToIntByPrecise(addrAndAmt[1], config.ONG_DECIMALS)
 		} else {
-			log.Errorf("token type not support, tokenType: %s", self.eatp.TokenType)
-			return "", nil, fmt.Errorf("not supprt token type: %s", self.eatp.TokenType)
+			log.Errorf("token type not support, tokenType: %s", self.excel.TokenType)
+			return "", nil, fmt.Errorf("not supprt token type: %s", self.excel.TokenType)
 		}
 		st := ont.State{
 			From:  self.account.Address,
@@ -281,7 +336,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		return "", nil, fmt.Errorf("common.AddressFromBase58 error: %s", err)
 	}
 	var tx *types.MutableTransaction
-	if (self.eatp.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
+	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -301,7 +356,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
-	} else if (self.eatp.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
+	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -321,11 +376,11 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
 		}
-	} else if (self.eatp.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
+	} else if (self.excel.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
 		if self.contractAddress == common.ADDRESS_EMPTY {
 			return "", nil, fmt.Errorf("contractAddress is nil")
 		}
-		val := utils.ParseAssetAmount(amount, self.precision)
+		val := utils.ParseAssetAmount(amount, self.decimals)
 		value := new(big.Int).SetUint64(val)
 		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, value}})
 		if err != nil {
@@ -335,21 +390,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		if err != nil {
 			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
 		}
-	} else if (self.eatp.TokenType == config.OEP5 && tokenType == "") || tokenType == config.OEP5 {
-		if self.contractAddress == common.ADDRESS_EMPTY {
-			return "", nil, fmt.Errorf("contractAddress is nil")
-		}
-		tokenId := ""
-		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{address, tokenId}})
-		if err != nil {
-			return "", nil, fmt.Errorf("NewNeoVMInvokeTransaction error: %s", err)
-		}
-		err = self.ontSdk.SignToTransaction(tx, self.account)
-		if err != nil {
-			return "", nil, fmt.Errorf("OEP4 SignToTransaction error: %s", err)
-		}
 	} else {
-		return "", nil, fmt.Errorf("[NewWithdrawTx] not supprt self.eatp.TokenType: %s,token Type: %s", self.eatp.TokenType, tokenType)
+		return "", nil, fmt.Errorf("[NewWithdrawTx] not supprt self.eatp.TokenType: %s,token Type: %s", self.excel.TokenType, tokenType)
 	}
 	t, err := tx.IntoImmutable()
 	if err != nil {
@@ -364,29 +406,33 @@ func (self *OntManager) GetAdminAddress() string {
 }
 
 func (self *OntManager) GetAdminBalance() (map[string]string, error) {
-	val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
-	if err != nil {
-		return nil, err
-	}
-	ontBa := strconv.FormatUint(val, 10)
-	val, err = self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
+	res := make(map[string]string)
+
+	// get ONG balance
+	val, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
 	if err != nil {
 		return nil, err
 	}
 	r := new(big.Int)
 	r.SetUint64(val)
 	ongBa := utils.ToStringByPrecise(r, 9)
-	res := make(map[string]string)
-	res[config.ONT] = ontBa
 	res[config.ONG] = ongBa
-	if self.eatp.TokenType == config.OEP4 {
+
+	if self.excel.TokenType == config.ONT {
+		val, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		if err != nil {
+			return nil, err
+		}
+		ba := strconv.FormatUint(val, 10)
+		res[config.ONT] = ba
+	} else if self.excel.TokenType == config.OEP4 {
 		oep4 := oep4.NewOep4(self.contractAddress, self.ontSdk)
 		val, err := oep4.BalanceOf(self.account.Address)
 		if err != nil {
 			return nil, err
 		}
-		ba := utils.ToStringByPrecise(val, uint64(self.precision))
-		res[self.eatp.TokenType] = ba
+		ba := utils.ToStringByPrecise(val, uint64(self.decimals))
+		res[self.excel.TokenType] = ba
 	}
 	return res, nil
 }
@@ -397,13 +443,13 @@ func (self *OntManager) EstimateFee(tokenType string, total int) (string, error)
 }
 
 func (self *OntManager) GetTotal() int {
-	return len(self.eatp.BillList)
+	return len(self.excel.BillList)
 }
 
 func (self *OntManager) ComputeSum() (string, error) {
 	sum := uint64(0)
-	if self.eatp.TokenType == config.ONT {
-		for _, item := range self.eatp.BillList {
+	if self.excel.TokenType == config.ONT {
+		for _, item := range self.excel.BillList {
 			val, err := strconv.ParseUint(item.Amount, 10, 64)
 			if err != nil {
 				return "", err
@@ -411,24 +457,24 @@ func (self *OntManager) ComputeSum() (string, error) {
 			sum += val
 		}
 		return strconv.FormatUint(sum, 10), nil
-	} else if self.eatp.TokenType == config.ONG {
-		for _, item := range self.eatp.BillList {
+	} else if self.excel.TokenType == config.ONG {
+		for _, item := range self.excel.BillList {
 			val := utils.ParseAssetAmount(item.Amount, 9)
 			sum += val
 		}
 		temp := new(big.Int)
 		temp.SetUint64(sum)
 		return utils.ToStringByPrecise(temp, uint64(9)), nil
-	} else if self.eatp.TokenType == config.OEP4 {
-		for _, item := range self.eatp.BillList {
-			val := utils.ParseAssetAmount(item.Amount, self.precision)
+	} else if self.excel.TokenType == config.OEP4 {
+		for _, item := range self.excel.BillList {
+			val := utils.ParseAssetAmount(item.Amount, self.decimals)
 			sum += val
 		}
 		temp := new(big.Int)
 		temp.SetUint64(sum)
-		return utils.ToStringByPrecise(temp, uint64(self.precision)), nil
+		return utils.ToStringByPrecise(temp, uint64(self.decimals)), nil
 	} else {
-		return "", fmt.Errorf("not support token type: %s", self.eatp.TokenType)
+		return "", fmt.Errorf("not support token type: %s", self.excel.TokenType)
 	}
 }
 

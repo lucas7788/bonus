@@ -22,7 +22,7 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 	res = res.Div(DEFAULT_GAS_PRICE, gwei)
 	fmt.Println(res)
 	eth := &config.Eth{
-		KeyStore:       "../../wallets/eth",
+		WorkingPath:    "../../wallets/eth",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
@@ -55,7 +55,7 @@ func TestEthManager_Withdraw(t *testing.T) {
 	//	//ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9",
 	//	}
 	eth := &config.Eth{
-		KeyStore:       "../../wallets/eth",
+		WorkingPath:    "../../wallets/eth",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
@@ -90,7 +90,7 @@ func TestNewEthManager(t *testing.T) {
 	//	TokenName:    config.ERC20,
 	//	ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"}
 	eth := &config.Eth{
-		KeyStore: "./testdata2/wallets/eth",
+		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
@@ -104,7 +104,7 @@ func TestEthManager_GetTxTime(t *testing.T) {
 	//	TokenName:    config.ERC20,
 	//	ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"}
 	eth := &config.Eth{
-		KeyStore: "./testdata2/wallets/eth",
+		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
@@ -122,7 +122,7 @@ func TestEthManager_GetTxTime(t *testing.T) {
 
 func TestEthManager_EstimateFee(t *testing.T) {
 	eth := &config.Eth{
-		KeyStore: "./testdata2/wallets/eth",
+		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",

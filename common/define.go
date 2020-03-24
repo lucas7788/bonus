@@ -1,9 +1,9 @@
 package common
 
 type TransferParam struct {
-	Id      int
-	Address string
-	Amount  string
+	Id      int    `json:"id"`
+	Address string `json:"address"`
+	Amount  string `json:"amount"`
 }
 
 type TransactionInfo struct {
@@ -53,15 +53,15 @@ const (
 )
 
 type ExcelParam struct {
-	BillList        []*TransferParam
-	TokenType       string
-	ContractAddress string
-	EventType       string
-	Admin           string
-	EstimateFee     string
+	BillList        []*TransferParam `json:"bill_list"`
+	TokenType       string           `json:"token_type"`
+	ContractAddress string           `json:"contract_address"`
+	EventType       string           `json:"event_type"`
+	Admin           string           `json:"admin"`
+	EstimateFee     string           `json:"estimate_fee"`
+	NetType         string           `json:"net_type"`
 	Sum             string
 	AdminBalance    map[string]string
-	NetType         string
 	Total           int
 }
 

@@ -1,22 +1,23 @@
 package transfer
 
 import (
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/interfaces"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
-	"strings"
-	"sync"
-	"time"
 )
 
 type TxHandleTask struct {
 	TransferQueue      chan *common.TransferParam
 	verifyTxQueue      chan *VerifyParam
 	hasTransferedOntid map[string]bool
-	closeChan          chan bool
+	CloseChan          chan bool
 	waitVerify         chan bool
 	rwLock             *sync.RWMutex
 	TransferStatus     common.TransferStatus
@@ -31,14 +32,14 @@ type VerifyParam struct {
 	Address   string
 }
 
-func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB) *TxHandleTask {
-	transferQueue := make(chan *common.TransferParam, config.TRANSFER_QUEUE_SIZE)
-	verifyQueue := make(chan *VerifyParam, config.VERIFY_TX_QUEUE_SIZE)
+func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *TxHandleTask {
+	transferQueue := make(chan *common.TransferParam, txQueueSize)
+	verifyQueue := make(chan *VerifyParam, txQueueSize/2)
 	return &TxHandleTask{
 		TransferQueue:  transferQueue,
 		verifyTxQueue:  verifyQueue,
 		TransferStatus: common.Transfering,
-		closeChan:      make(chan bool),
+		CloseChan:      make(chan bool),
 		waitVerify:     make(chan bool),
 		TokenType:      tokenType,
 		db:             db,
@@ -79,13 +80,13 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 }
 
 func (self *TxHandleTask) WaitClose() {
-	<-self.closeChan
+	<-self.CloseChan
 }
 
 func (self *TxHandleTask) exit() {
 	close(self.verifyTxQueue)
 	log.Infof("1. close(self.verifyTxQueue)")
-	self.closeChan <- true
+	self.CloseChan <- true
 	<-self.waitVerify
 	log.Info("exit StartHandleTransferTask gorountine")
 }

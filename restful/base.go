@@ -10,6 +10,16 @@ func ResponsePack(errCode int64) map[string]interface{} {
 	}
 }
 
+func ResponseSuccess(result interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"Action":  "",
+		"Result":  result,
+		"Error":   SUCCESS,
+		"Desc":    ErrMap[SUCCESS],
+		"Version": "1.0.0",
+	}
+}
+
 var ErrMap = map[int64]string{
 	SUCCESS:                     "SUCCESS",
 	PARA_ERROR:                  "PARAMETER ERROR",
@@ -36,6 +46,7 @@ var ErrMap = map[int64]string{
 	NetTypeError:                "NetTypeError",
 	NotSupportTokenType:         "NotSupportTokenType",
 	NotExistenceEvtType:         "NotExistenceEvtType",
+	SetGasPriceFailed:           "SetGasPriceFailed",
 }
 
 const (
@@ -64,4 +75,5 @@ const (
 	NetTypeError                = 40021
 	NotSupportTokenType         = 40022
 	NotExistenceEvtType         = 40023
+	SetGasPriceFailed           = 40024
 )

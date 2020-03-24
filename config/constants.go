@@ -13,20 +13,11 @@ const (
 )
 
 const (
-	KEY_EVT_TY    = "key_evt_ty"
-	KEY_GAS_PRICE = "key_gas_price"
-)
-
-const (
 	ONT   = "ONT"
 	ONG   = "ONG"
 	OEP4  = "OEP4"
-	OEP5  = "OEP5"
 	ETH   = "ETH"
 	ERC20 = "ERC20"
-	KLAY  = "KLAY"
-	NEO   = "NEO"
-	GAS   = "GAS"
 )
 
 const (
@@ -35,4 +26,8 @@ const (
 	EthSendTxSlot = 20
 	EthSleepTime  = 6
 	PendingLimit  = 100
+)
+
+var (
+	SupportedTokenTypes = []string{ONT, ONG, OEP4, ETH, ERC20}
 )

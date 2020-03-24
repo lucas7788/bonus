@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/ontio/bonus/config"
 	"github.com/urfave/cli"
-	"strings"
 )
 
 var (

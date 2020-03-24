@@ -3,10 +3,11 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ontio/ontology/common/log"
 	"math"
 	"math/big"
 	"strings"
+
+	"github.com/ontio/ontology/common/log"
 )
 
 func ParseParams(req interface{}, params map[string]interface{}) error {

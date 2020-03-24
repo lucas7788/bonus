@@ -1,0 +1,9 @@
+.idea/
+.log
+.DS_Store
+*.orig
+*.rej
+vendor/*
+*.exe
+*.iml
+main

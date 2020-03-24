@@ -3,13 +3,14 @@ package eth
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"strings"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ontio/bonus/utils"
-	"io/ioutil"
-	"strings"
 )
 
 type WithdrawTx struct {

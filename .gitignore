@@ -7,3 +7,6 @@ vendor/*
 *.exe
 *.iml
 main
+Log/*
+wallet/*
+db/*

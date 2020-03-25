@@ -224,15 +224,15 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, tx
 	var strSql string
 	if txResult == common.AllStatus {
 		if start == 0 && end == 0 {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?  order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?  order by id DESC limit ?, ?"
 		}
 	} else {
 		if start == 0 && end == 0 {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? and TxResult = ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? and TxResult = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? and TxResult = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? and TxResult = ? order by id DESC limit ?, ?"
 		}
 	}
 	stmt, err := this.db.Prepare(strSql)

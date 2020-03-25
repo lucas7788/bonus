@@ -331,8 +331,11 @@ func (this *EthManager) updateContractInfo(address string) error {
 }
 
 func (self *EthManager) StartTransfer() {
+	// TODO: verify gas fee before start
 	self.StartHandleTxTask()
 	go func() {
+		// TODO: merge UpdateTxInfoTable with { for BillList }
+		// todo: build tx here?
 		err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
 		if err != nil {
 			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)

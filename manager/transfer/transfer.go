@@ -96,6 +96,8 @@ func (self *TxHandleTask) exit() {
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
 	for {
 		select {
+		// FIXME: select close channel
+		// TODO: add retry-channel
 		case param, ok := <-self.TransferQueue:
 			if !ok || param == nil {
 				self.exit()
@@ -103,6 +105,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			}
 			var txHex []byte
 			var err error
+			// TODO: query txhex from db in tx-build routine?
 			txInfo, err := self.db.QueryTxHexByExcelAndAddr(self.netTy, eventType, param.Address, param.Id)
 			if err != nil {
 				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
@@ -173,6 +176,8 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			var hash string
 			for {
 				hash, err = mana.SendTx(txHex)
+				// TODO: dont need retry here, add one retry-channel, send to retry channel if failed
+				// FIXME: SendFailed status seems not necessary
 				if err != nil && retry < config.RetryLimit {
 					if err != nil {
 						log.Errorf("SendTx error :%s, retry:%d", err, retry)
@@ -220,6 +225,9 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 
 	for {
 		select {
+		// TODO: add pending-verify tx to a buffer
+		// TODO: add timer, verify all tx in the buffer when timeout.  If verify-retry-timeout, request resend tx
+		// TODO: get new tx from verifyTxQueue if buffer is not full
 		case verifyParam, ok := <-self.verifyTxQueue:
 			if !ok || verifyParam.TxHash == "" {
 				self.TransferStatus = common.Transfered

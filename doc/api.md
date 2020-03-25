@@ -92,11 +92,11 @@ http://127.0.0.1:8080/api/v1/uploadexecl
 ```
 
 
-2. 查询已经上传的excel的eventtype   GET
+2. 查询eventtype   GET
 
 请求
 ```
-http://127.0.0.1:8080/api/v1/getexcelevtty
+http://127.0.0.1:8080/api/v1/getevtty
 ```
 响应
 ```json
@@ -300,26 +300,6 @@ http://127.0.0.1:8080/api/v1/gettransferprogress/ssserc20/testnet
 }
 ```
 
-9 查询交易有关的所有eventType   GET
-
-`/api/v1/gettxInfoevtty/<netty>`
-
-请求
-```
-http://127.0.0.1:8080/api/v1/gettxInfoevtty/testnet
-```
-响应
-```
-{
-    "Action": "",
-    "Desc": "SUCCESS",
-    "Error": 1,
-    "Result": [
-        "ssserc20"
-    ],
-    "Version": "1.0.0"
-}
-```
 
 10 查询交易历史数据  GET
 `/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>/<txStatus>`

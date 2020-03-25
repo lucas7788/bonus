@@ -31,6 +31,7 @@ type GetTxInfoByEvtType struct {
 	TokenType       string
 	ContractAddress string
 	NetType         string
+	Total           int
 }
 
 type TransferStatus byte

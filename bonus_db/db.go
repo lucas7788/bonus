@@ -220,19 +220,19 @@ func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int)
 	return nil, nil
 }
 
-func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, txResult common.TxResult) ([]*common.TransactionInfo, error) {
+func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, pageSize int, txResult common.TxResult) ([]*common.TransactionInfo, int, error) {
 	var strSql string
 	if txResult == common.AllStatus {
-		if start == 0 && end == 0 {
+		if start == 0 && pageSize == 0 {
 			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 		} else {
 			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?  order by id DESC limit ?, ?"
 		}
 	} else {
-		if start == 0 && end == 0 {
+		if start == 0 && pageSize == 0 {
 			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? and TxResult = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? and TxResult = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ? and TxResult = ? order by id limit ?, ?"
 		}
 	}
 	stmt, err := this.db.Prepare(strSql)
@@ -240,19 +240,27 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, tx
 		defer stmt.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var rows *sql.Rows
-	if start == 0 && end == 0 {
-		rows, err = stmt.Query(eventType)
+	if txResult == common.AllStatus {
+		if start == 0 && pageSize == 0 {
+			rows, err = stmt.Query(eventType)
+		} else {
+			rows, err = stmt.Query(eventType, start, pageSize)
+		}
 	} else {
-		rows, err = stmt.Query(eventType, start, end)
+		if start == 0 && pageSize == 0 {
+			rows, err = stmt.Query(eventType, txResult)
+		} else {
+			rows, err = stmt.Query(eventType, txResult, start, pageSize)
+		}
 	}
 	if rows != nil {
 		defer rows.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	res := make([]*common.TransactionInfo, 0)
 	for rows.Next() {
@@ -261,7 +269,7 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, tx
 		var txTime uint32
 		var id int
 		if err = rows.Scan(&id, &tokenType, &netty, &contractAddress, &address, &amount, &txHash, &txTime, &txResult, &errorDetail); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		res = append(res, &common.TransactionInfo{
 			Id:              id,
@@ -277,5 +285,53 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, tx
 			ErrorDetail:     errorDetail,
 		})
 	}
-	return res, nil
+	total, err := this.getTxInfoTotal(eventType, txResult)
+	if err != nil {
+		return nil, 0, err
+	}
+	return res, total, nil
+}
+
+func (this *BonusDB) getTxInfoTotal(eventType string, txResult common.TxResult) (int, error) {
+	var strSql string
+	if txResult == common.AllStatus {
+		strSql = "select count(Id) from bonus_transaction_info where EventType=?"
+	} else {
+		strSql = "select count(Id) from bonus_transaction_info where EventType=? and TxResult=?"
+	}
+
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	var rows *sql.Rows
+	if txResult == common.AllStatus {
+		rows, err = stmt.Query(eventType)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		rows, err = stmt.Query(eventType, txResult)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var total int
+		if err = rows.Scan(&total); err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
+	return 0, nil
 }

@@ -10,8 +10,7 @@ const (
 	POST_WITHDRAW      = "/api/v1/withdraw"
 	POST_SET_GAS_PRICE = "/api/v1/setgasprice"
 
-	GET_Excel_EVENT_TYPE            = "/api/v1/getexcelevtty"
-	GET_TxInfo_EVENT_TYPE           = "/api/v1/gettxInfoevtty/<netty>"
+	GET_EVENT_TYPE                  = "/api/v1/getevtty"
 	GET_GAS_PRICE                   = "/api/v1/getgasprice/<evtty>/<netty>"
 	Get_TxInfo_BY_EVENT_TYPE        = "/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>/<txStatus>"
 	Get_Excel_Param                 = "/api/v1/getexcelparam/<evtty>/<netty>/<pagenum>/<pagesize>"
@@ -28,8 +27,7 @@ func InitRouter() *routing.Router {
 	router.Post(POST_SET_GAS_PRICE, SetGasPrice)
 
 	router.Get(Get_TxInfo_BY_EVENT_TYPE, GetTxInfoByEventType)
-	router.Get(GET_TxInfo_EVENT_TYPE, GetTxInfoEventType)
-	router.Get(GET_Excel_EVENT_TYPE, GetExcelEventType)
+	router.Get(GET_EVENT_TYPE, GetEventType)
 	router.Get(GET_GAS_PRICE, GetGasPrice)
 	router.Get(Get_Excel_Param, GetExcelParamByEvtType)
 	router.Get(Get_Tansfer_Progress, GetTransferProgress)

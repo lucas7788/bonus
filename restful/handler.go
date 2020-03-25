@@ -144,7 +144,7 @@ func Withdraw(ctx *routing.Context) error {
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
-func GetExcelEventType(ctx *routing.Context) error {
+func GetEventType(ctx *routing.Context) error {
 	eventdirs, err := config.GetAllEventDirs()
 	if err != nil {
 		return writeResponse(ctx, QueryExcelParamByEventType)
@@ -165,10 +165,6 @@ func GetExcelEventType(ctx *routing.Context) error {
 	}
 
 	return writeResponse(ctx, ResponseSuccess(events))
-}
-
-func GetTxInfoEventType(ctx *routing.Context) error {
-	return GetExcelEventType(ctx)
 }
 
 func GetTransferProgress(ctx *routing.Context) error {
@@ -242,8 +238,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		param.PageNum = 1
 	}
 	start := (param.PageNum - 1) * param.PageSize
-	end := start + param.PageSize
-	txInfo, err := mgr.QueryTxInfo(start, end, param.TxResult)
+	txInfo, total, err := mgr.QueryTxInfo(start, param.PageSize, param.TxResult)
 	if err != nil {
 		log.Errorf("QueryTxInfoByEventType error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryResultByEventType))
@@ -274,6 +269,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		TokenType:       mgr.GetExcelParam().TokenType,
 		ContractAddress: mgr.GetExcelParam().ContractAddress,
 		NetType:         param.NetTy,
+		Total:           total,
 	}
 
 	r := ResponsePack(SUCCESS)

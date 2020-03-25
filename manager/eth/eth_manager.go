@@ -203,7 +203,7 @@ func (this *EthManager) GetExcelParam() *common2.ExcelParam {
 	return this.excel
 }
 
-func (self *EthManager) QueryTxInfo(start, end int, txResult common2.TxResult) ([]*common2.TransactionInfo, error) {
+func (self *EthManager) QueryTxInfo(start, end int, txResult common2.TxResult) ([]*common2.TransactionInfo,int, error) {
 	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end, txResult)
 }
 

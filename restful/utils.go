@@ -17,10 +17,10 @@ type QueryTxInfoParam struct {
 	EvtTy    string
 	PageSize int
 	PageNum  int
+	TxResult common.TxResult
 }
 
 func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
-
 	netType := ctx.Param("netty")
 	evtty := ctx.Param("evtty")
 	pageSize := ctx.Param("pagesize")
@@ -33,11 +33,18 @@ func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
 	if err != nil {
 		return nil, PARA_ERROR
 	}
+	status := ctx.Param("txStatus")
+	txStatus,err := strconv.Atoi(status)
+	if err != nil {
+		log.Errorf("txStatus error: %s", status)
+		return nil, PARA_ERROR
+	}
 	return &QueryTxInfoParam{
 		NetTy:    netType,
 		EvtTy:    evtty,
 		PageSize: int(pageSi),
 		PageNum:  int(pageNu),
+		TxResult: common.TxResult(txStatus),
 	}, SUCCESS
 }
 

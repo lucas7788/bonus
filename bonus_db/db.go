@@ -19,7 +19,7 @@ type BonusDB struct {
 }
 
 func NewBonusDB(tokenTy, evtTy, netTy string, doCreate bool) (*BonusDB, error) {
-	dbFileName := config.GetEventDBFilename(evtTy, netTy)
+	dbFileName := config.GetEventDBFilename(netTy, tokenTy, evtTy)
 	if err := common.CheckPath(dbFileName); err != nil {
 		return nil, fmt.Errorf("failed to create %s: %s", dbFileName, err)
 	}
@@ -41,21 +41,11 @@ func NewBonusDB(tokenTy, evtTy, netTy string, doCreate bool) (*BonusDB, error) {
 	}
 
 	if doCreate {
-		createTxInfoTableSqlTest := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info_test"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
+		createTxInfoTableSqlTest := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
 		_, err = db.Exec(createTxInfoTableSqlTest, nil)
 		if err != nil {
 			return nil, err
 		}
-		createTxInfoTableSqlMain := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info_main"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
-		_, err = db.Exec(createTxInfoTableSqlMain, nil)
-		if err != nil {
-			return nil, err
-		}
-		//createExcelTableSql := `CREATE TABLE IF NOT EXISTS "excel_info"("Id" INTEGER PRIMARY KEY autoincrement NOT NULL, "TokenType" varchar(20) not null, "EventType" varchar(100) not null,"ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "GasPrice" varchar(100) not null)`
-		//_, err = db.Exec(createExcelTableSql, nil)
-		//if err != nil {
-		//	return nil, err
-		//}
 	}
 	return &BonusDB{
 		db: db,
@@ -76,12 +66,7 @@ func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
 		return fmt.Errorf("database has the same data")
 	}
 	content := strings.Join(sqlStrArr, ",")
-	var strSql string
-	if args[0].NetType == config.MainNet {
-		strSql = "insert into bonus_transaction_info_main (Id,NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
-	} else {
-		strSql = "insert into bonus_transaction_info_test (Id,NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
-	}
+	strSql := "insert into bonus_transaction_info (Id,NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
 	_, err := this.db.Exec(strSql + content)
 	if err != nil {
 		return err
@@ -89,14 +74,8 @@ func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
 	return nil
 }
 
-func (this *BonusDB) UpdateTxInfo(netTy, txHash, TxHex string, txResult common.TxResult, eventType, address string, id int) error {
-	var strSql string
-	if netTy == config.MainNet {
-		strSql = "update bonus_transaction_info_main set TxHash=?,TxHex=?,TxResult=? where EventType = ? and Address = ? and id = ?"
-	} else {
-		strSql = "update bonus_transaction_info_test set TxHash=?,TxHex=?,TxResult=? where EventType = ? and Address = ? and id = ?"
-	}
-
+func (this *BonusDB) UpdateTxInfo(txHash, TxHex string, txResult common.TxResult, eventType, address string, id int) error {
+	strSql := "update bonus_transaction_info set TxHash=?,TxHex=?,TxResult=? where EventType = ? and Address = ? and id = ?"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -108,14 +87,8 @@ func (this *BonusDB) UpdateTxInfo(netTy, txHash, TxHex string, txResult common.T
 	return err
 }
 
-func (this *BonusDB) UpdateTxResult(netty, eventType, address string, id int, txResult common.TxResult, txTime uint32, errDetail string) error {
-	var strSql string
-	if netty == config.MainNet {
-		strSql = "update bonus_transaction_info_main set TxResult=?, TxTime=?, ErrorDetail= ? where EventType = ? and Address = ? and id=?"
-	} else {
-		strSql = "update bonus_transaction_info_test set TxResult=?, TxTime=?, ErrorDetail= ? where EventType = ? and Address = ? and id=?"
-	}
-
+func (this *BonusDB) UpdateTxResult(eventType, address string, id int, txResult common.TxResult, txTime uint32, errDetail string) error {
+	strSql := "update bonus_transaction_info set TxResult=?, TxTime=?, ErrorDetail= ? where EventType = ? and Address = ? and id=?"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -127,24 +100,24 @@ func (this *BonusDB) UpdateTxResult(netty, eventType, address string, id int, tx
 	return err
 }
 
-func (this *BonusDB) QueryTransferProgress(netty, eventType, netType string) (map[string]int, error) {
-	success, err := this.getSum(netty, eventType, netType, common.TxSuccess)
+func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[string]int, error) {
+	success, err := this.getSum(eventType, netType, common.TxSuccess)
 	if err != nil {
 		return nil, err
 	}
-	failed, err := this.getSum(netty, eventType, netType, common.TxFailed)
+	failed, err := this.getSum(eventType, netType, common.TxFailed)
 	if err != nil {
 		return nil, err
 	}
-	transfering, err := this.getSum(netty, eventType, netType, common.OneTransfering)
+	transfering, err := this.getSum(eventType, netType, common.OneTransfering)
 	if err != nil {
 		return nil, err
 	}
-	notSend, err := this.getSum(netty, eventType, netType, common.NotSend)
+	notSend, err := this.getSum(eventType, netType, common.NotSend)
 	if err != nil {
 		return nil, err
 	}
-	sendFailed, err := this.getSum(netty, eventType, netType, common.SendFailed)
+	sendFailed, err := this.getSum(eventType, netType, common.SendFailed)
 	if err != nil {
 		return nil, err
 	}
@@ -157,13 +130,8 @@ func (this *BonusDB) QueryTransferProgress(netty, eventType, netType string) (ma
 	return res, nil
 }
 
-func (this *BonusDB) getSum(netty, eventType, netType string, txResult common.TxResult) (int, error) {
-	var strSql string
-	if netty == config.MainNet {
-		strSql = "select count(Id) from bonus_transaction_info_main where EventType=? and NetType=? and TxResult=?"
-	} else {
-		strSql = "select count(Id) from bonus_transaction_info_test where EventType=? and NetType=? and TxResult=?"
-	}
+func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
+	strSql := "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
 
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
@@ -189,13 +157,8 @@ func (this *BonusDB) getSum(netty, eventType, netType string, txResult common.Tx
 	return 0, nil
 }
 
-func (this *BonusDB) QueryTxHexByTxHash(netty, txHash string) (*common.TransactionInfo, error) {
-	var strSql string
-	if netty == config.MainNet {
-		strSql = "select TxHash,TxHex,TxResult from bonus_transaction_info_main where TxHash=?"
-	} else {
-		strSql = "select TxHash,TxHex,TxResult from bonus_transaction_info_test where TxHash=?"
-	}
+func (this *BonusDB) QueryTxHexByTxHash(txHash string) (*common.TransactionInfo, error) {
+	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where TxHash=?"
 
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
@@ -226,14 +189,8 @@ func (this *BonusDB) QueryTxHexByTxHash(netty, txHash string) (*common.Transacti
 	return nil, nil
 }
 
-func (this *BonusDB) QueryTxHexByExcelAndAddr(netty, eventType, address string, id int) (*common.TransactionInfo, error) {
-	var strSql string
-	if netty == config.MainNet {
-		strSql = "select TxHash,TxHex,TxResult from bonus_transaction_info_main where EventType=? and Address=? and Id=?"
-	} else {
-		strSql = "select TxHash,TxHex,TxResult from bonus_transaction_info_test where EventType=? and Address=? and Id=?"
-	}
-
+func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {
+	strSql := "select TxHash,TxHex,TxResult from bonus_transaction_info where EventType=? and Address=? and Id=?"
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
 		defer stmt.Close()
@@ -263,19 +220,19 @@ func (this *BonusDB) QueryTxHexByExcelAndAddr(netty, eventType, address string, 
 	return nil, nil
 }
 
-func (this *BonusDB) QueryTxInfoByEventType(netty, eventType string, start, end int) ([]*common.TransactionInfo, error) {
+func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, end int, txResult common.TxResult) ([]*common.TransactionInfo, error) {
 	var strSql string
-	if netty == config.MainNet {
+	if txResult == common.AllStatus {
 		if start == 0 && end == 0 {
 			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ?  order by id DESC limit ?, ?"
 		}
 	} else {
 		if start == 0 && end == 0 {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? and TxResult = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_test where EventType = ? order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info_main where EventType = ? and TxResult = ? order by id DESC limit ?, ?"
 		}
 	}
 	stmt, err := this.db.Prepare(strSql)

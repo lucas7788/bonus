@@ -50,6 +50,7 @@ const (
 	OneTransfering
 	TxFailed
 	TxSuccess
+	AllStatus
 )
 
 type ExcelParam struct {

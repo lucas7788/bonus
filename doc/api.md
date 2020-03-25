@@ -322,15 +322,18 @@ http://127.0.0.1:8080/api/v1/gettxInfoevtty/testnet
 ```
 
 10 查询交易历史数据  GET
-`/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>`
+`/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>/<txStatus>`
 
 参数
 `evtty`事件类型
 `netty` 网络类型
 `pagenum` 第几页
 `pagesize` 每页的大小
+`txStatus` 交易的状态
 
-pagenum 和pagesize 同时为零  表示查询所有数据
+pagenum 和pagesize 同时为零 并且txResult为6, 表示查询所有状态的数据
+
+pagenum 和pagesize 同时为零 并且txResult为0到5中的任意值  表示查询相应状态的所有数据
 
 ```
 http://127.0.0.1:8080/api/v1/gettxinfo/ssserc20/testnet/1/10

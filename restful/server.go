@@ -13,7 +13,7 @@ const (
 	GET_Excel_EVENT_TYPE            = "/api/v1/getexcelevtty"
 	GET_TxInfo_EVENT_TYPE           = "/api/v1/gettxInfoevtty/<netty>"
 	GET_GAS_PRICE                   = "/api/v1/getgasprice/<evtty>/<netty>"
-	Get_TxInfo_BY_EVENT_TYPE        = "/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>"
+	Get_TxInfo_BY_EVENT_TYPE        = "/api/v1/gettxinfo/<evtty>/<netty>/<pagenum>/<pagesize>/<txStatus>"
 	Get_Excel_Param                 = "/api/v1/getexcelparam/<evtty>/<netty>/<pagenum>/<pagesize>"
 	Get_Tansfer_Progress            = "/api/v1/gettransferprogress/<evtty>/<netty>"
 	GET_ADMIN_BALANCE_BY_EVENT_TYPE = "/api/v1/getadminbalance/<evtty>/<netty>"

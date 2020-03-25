@@ -65,7 +65,6 @@ type Ont struct {
 	OntJsonRpcAddressMainNet string `json:"rpc_addr_main_net"`
 	GasPrice                 uint64 `json:"gas_price"`
 	GasLimit                 uint64 `json:"gas_limit"`
-	WorkingPath              string `json:"working_path"`
 }
 
 type Eth struct {
@@ -73,7 +72,6 @@ type Eth struct {
 	RpcAddrMainNet string `json:"rpc_addr_main_net"`
 	GasPrice       uint64 `json:"gas_price"`
 	GasLimit       uint64 `json:"gas_limit"`
-	WorkingPath    string `json:"working_path"`
 }
 type EthToken struct {
 	TokenName    string `json:"token_name"`
@@ -87,9 +85,8 @@ func GetEventDir(tokenType string, eventType string) string {
 	return filepath.Join(getBaseDir(), tokenType+"_"+eventType)
 }
 
-func GetEventDBFilename(eventType, net string) string {
-	n := eventType + "_" + net
-	return filepath.Join(getBaseDir(), n, n+".db")
+func GetEventDBFilename(net,tokenType, eventType string) string {
+	return filepath.Join(GetEventDir(tokenType, eventType), net, net+".db")
 }
 
 //

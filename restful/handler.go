@@ -14,7 +14,8 @@ import (
 	"github.com/qiangxue/fasthttp-routing"
 )
 
-var DefBonusMap = new(sync.Map) // tokentype + event-name -> withdraw-mgr
+var DefBonusMap = new(sync.Map) // evttype + nettype -> withdraw-mgr
+// tokentype + "_" + evttype -> event
 
 func UploadExcel(ctx *routing.Context) error {
 	excelParam, errCode := ParseExcelParam(ctx)
@@ -47,7 +48,7 @@ func UploadExcel(ctx *routing.Context) error {
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
 	DefBonusMap.Store(eventName, nil)
-	DefBonusMap.Store(config.GetEventDir(excelParam.TokenType, excelParam.EventType), mgr)
+	DefBonusMap.Store(excelParam.EventType+excelParam.NetType, mgr)
 	return writeResponse(ctx, ResponseSuccess(excelParam))
 }
 
@@ -184,6 +185,7 @@ func GetTransferProgress(ctx *routing.Context) error {
 	}
 	total := mgr.GetTotal()
 	res["total"] = total
+	res["evtStatus"] = int(mgr.GetStatus())
 	return writeResponse(ctx, ResponseSuccess(res))
 }
 
@@ -241,7 +243,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	}
 	start := (param.PageNum - 1) * param.PageSize
 	end := start + param.PageSize
-	txInfo, err := mgr.QueryTxInfo(start, end)
+	txInfo, err := mgr.QueryTxInfo(start, end, param.TxResult)
 	if err != nil {
 		log.Errorf("QueryTxInfoByEventType error: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryResultByEventType))
@@ -332,7 +334,7 @@ func getTokenManager(eventType, netType string) (interfaces.WithdrawManager, int
 		return nil, NoTheEventTypeError
 	}
 
-	if mn, present := DefBonusMap.Load(config.GetEventDir(tokenType, eventType)); present && mn != nil {
+	if mn, present := DefBonusMap.Load(eventType + netType); present && mn != nil {
 		mgr, ok := mn.(interfaces.WithdrawManager)
 		if !ok {
 			return nil, TypeTransferError
@@ -345,7 +347,7 @@ func getTokenManager(eventType, netType string) (interfaces.WithdrawManager, int
 		log.Errorf("CreateManager error: %s", err)
 		return nil, InitManagerError
 	}
-	DefBonusMap.Store(config.GetEventDir(mgr.GetExcelParam().TokenType, eventType), mgr)
+	DefBonusMap.Store(eventType+netType, mgr)
 
 	return mgr, SUCCESS
 }

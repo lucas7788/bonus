@@ -50,16 +50,14 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	}
 	ontSdk := sdk.NewOntologySdk()
 	ontSdk.NewRpcClient().SetAddress(rpcAddr)
-	if cfg.WorkingPath == "" {
-		cfg.WorkingPath = config.GetEventDir(eatp.TokenType, eatp.EventType)
-	}
-	err := common2.CheckPath(cfg.WorkingPath)
+	walletPath := config.GetEventDir(eatp.TokenType, eatp.EventType)
+	err := common2.CheckPath(walletPath)
 	if err != nil {
 		return nil, err
 	}
 
 	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.EventType)
-	walletFile := filepath.Join(cfg.WorkingPath, walletName)
+	walletFile := filepath.Join(walletPath, walletName)
 	var wallet *sdk.Wallet
 	if !common2.PathExists(walletFile) {
 		wallet, err = ontSdk.CreateWallet(walletFile)
@@ -156,7 +154,7 @@ func (this *OntManager) GetGasPrice() uint64 {
 }
 
 func (this *OntManager) QueryTransferProgress() (map[string]int, error) {
-	return this.db.QueryTransferProgress(this.netType, this.excel.EventType, this.excel.NetType)
+	return this.db.QueryTransferProgress(this.excel.EventType, this.excel.NetType)
 }
 
 func (this *OntManager) CloseDB() {
@@ -170,8 +168,8 @@ func (self *OntManager) GetExcelParam() *common2.ExcelParam {
 	return self.excel
 }
 
-func (self *OntManager) QueryTxInfo(start, end int) ([]*common2.TransactionInfo, error) {
-	return self.db.QueryTxInfoByEventType(self.netType, self.excel.EventType, start, end)
+func (self *OntManager) QueryTxInfo(start, end int, txResult common2.TxResult) ([]*common2.TransactionInfo, error) {
+	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end, txResult)
 }
 
 func (self *OntManager) VerifyAddress(address string) bool {
@@ -211,7 +209,7 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 }
 
 func (self *OntManager) StartHandleTxTask() {
-	txHandleTask := transfer.NewTxHandleTask(self.netType, self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE)
+	txHandleTask := transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE)
 	self.txHandleTask = txHandleTask
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
 	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)

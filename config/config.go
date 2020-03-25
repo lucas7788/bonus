@@ -85,7 +85,7 @@ func GetEventDir(tokenType string, eventType string) string {
 	return filepath.Join(getBaseDir(), tokenType+"_"+eventType)
 }
 
-func GetEventDBFilename(net,tokenType, eventType string) string {
+func GetEventDBFilename(net, tokenType, eventType string) string {
 	return filepath.Join(GetEventDir(tokenType, eventType), net, net+".db")
 }
 

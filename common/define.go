@@ -44,7 +44,7 @@ const (
 type TxResult byte
 
 const (
-	NotSend TxResult = iota //
+	NotBuild TxResult = iota //
 	BuildTxFailed
 	SendFailed
 	OneTransfering

@@ -113,7 +113,7 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	notSend, err := this.getSum(eventType, netType, common.NotSend)
+	notSend, err := this.getSum(eventType, netType, common.NotBuild)
 	if err != nil {
 		return nil, err
 	}

@@ -34,7 +34,7 @@ func ParseQueryTxInfoParam(ctx *routing.Context) (*QueryTxInfoParam, int64) {
 		return nil, PARA_ERROR
 	}
 	status := ctx.Param("txStatus")
-	txStatus,err := strconv.Atoi(status)
+	txStatus, err := strconv.Atoi(status)
 	if err != nil {
 		log.Errorf("txStatus error: %s", status)
 		return nil, PARA_ERROR

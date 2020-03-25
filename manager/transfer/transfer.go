@@ -64,7 +64,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 				Address:         trParam.Address,
 				Amount:          trParam.Amount,
 				NetType:         mana.GetNetType(),
-				TxResult:        common.NotSend,
+				TxResult:        common.NotBuild,
 			}
 			txInfos = append(txInfos, txInfo)
 		}

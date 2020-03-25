@@ -179,8 +179,6 @@ func GetTransferProgress(ctx *routing.Context) error {
 		log.Errorf("[GetTransferProgress] QueryTransferProgress failed: %s", err)
 		return writeResponse(ctx, ResponsePack(QueryTransferProgressFailed))
 	}
-	total := mgr.GetTotal()
-	res["total"] = total
 	res["evtStatus"] = int(mgr.GetStatus())
 	return writeResponse(ctx, ResponseSuccess(res))
 }

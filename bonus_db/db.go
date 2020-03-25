@@ -10,6 +10,7 @@ import (
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	common2 "github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/common/log"
 )
 
 //var DefBonusDB *BonusDB
@@ -18,12 +19,14 @@ type BonusDB struct {
 	db *sql.DB
 }
 
-func NewBonusDB(tokenTy, evtTy, netTy string, doCreate bool) (*BonusDB, error) {
+func NewBonusDB(tokenTy, evtTy, netTy string) (*BonusDB, error) {
 	dbFileName := config.GetEventDBFilename(netTy, tokenTy, evtTy)
 	if err := common.CheckPath(dbFileName); err != nil {
 		return nil, fmt.Errorf("failed to create %s: %s", dbFileName, err)
 	}
-	if !common2.FileExisted(dbFileName) && doCreate {
+	existed := true
+	if !common2.FileExisted(dbFileName) {
+		existed = false
 		file, err := os.Create(dbFileName)
 		if err != nil {
 			return nil, err
@@ -39,8 +42,8 @@ func NewBonusDB(tokenTy, evtTy, netTy string, doCreate bool) (*BonusDB, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if doCreate {
+	log.Info("[NewBonusDB] existed:", existed)
+	if !existed {
 		createTxInfoTableSqlTest := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
 		_, err = db.Exec(createTxInfoTableSqlTest, nil)
 		if err != nil {
@@ -121,17 +124,27 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	total, err := this.getSum(eventType, netType, common.AllStatus)
+	if err != nil {
+		return nil, err
+	}
 	res := make(map[string]int)
 	res["success"] = success
 	res["failed"] = failed
 	res["transfering"] = transfering
 	res["notSend"] = notSend
 	res["sendFailed"] = sendFailed
+	res["total"] = total
 	return res, nil
 }
 
 func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
-	strSql := "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
+	var strSql string
+	if txResult == common.AllStatus {
+		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=?"
+	} else {
+		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
+	}
 
 	stmt, err := this.db.Prepare(strSql)
 	if stmt != nil {
@@ -140,7 +153,12 @@ func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult)
 	if err != nil {
 		return 0, err
 	}
-	rows, err := stmt.Query(eventType, netType, txResult)
+	var rows *sql.Rows
+	if txResult == common.AllStatus {
+		rows, err = stmt.Query(eventType, netType)
+	} else {
+		rows, err = stmt.Query(eventType, netType, txResult)
+	}
 	if rows != nil {
 		defer rows.Close()
 	}

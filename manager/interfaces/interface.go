@@ -24,7 +24,7 @@ type WithdrawManager interface {
 	Store() error
 	CloseDB()
 	QueryTransferProgress() (map[string]int, error)
-	QueryTxInfo(start, end int, txResult common.TxResult) ([]*common.TransactionInfo,int, error)
+	QueryTxInfo(start, end int, txResult common.TxResult) ([]*common.TransactionInfo, int, error)
 	SetGasPrice(gasPrice uint64) error
 	GetGasPrice() uint64
 }

@@ -14,7 +14,7 @@ import (
 func CreateManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
 	if db == nil {
 		var err error
-		db, err = bonus_db.NewBonusDB(eatp.TokenType, eatp.EventType, netType, true)
+		db, err = bonus_db.NewBonusDB(eatp.TokenType, eatp.EventType, netType)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +45,7 @@ func CreateManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB
 }
 
 func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawManager, error) {
-	db, err := bonus_db.NewBonusDB(tokenType, eventType, netType, false)
+	db, err := bonus_db.NewBonusDB(tokenType, eventType, netType)
 	if err != nil {
 		return nil, err
 	}

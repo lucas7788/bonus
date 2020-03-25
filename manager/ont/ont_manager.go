@@ -168,7 +168,7 @@ func (self *OntManager) GetExcelParam() *common2.ExcelParam {
 	return self.excel
 }
 
-func (self *OntManager) QueryTxInfo(start, end int, txResult common2.TxResult) ([]*common2.TransactionInfo,int, error) {
+func (self *OntManager) QueryTxInfo(start, end int, txResult common2.TxResult) ([]*common2.TransactionInfo, int, error) {
 	return self.db.QueryTxInfoByEventType(self.excel.EventType, start, end, txResult)
 }
 

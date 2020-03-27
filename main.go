@@ -66,6 +66,7 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("[startHtml] error: %s", err)
 		return
 	}
+	log.Info("startHtml success")
 	waitToExit()
 }
 

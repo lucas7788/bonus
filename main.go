@@ -14,6 +14,8 @@ import (
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
+	"path/filepath"
+	"net/http"
 )
 
 func setupAPP() *cli.App {
@@ -59,8 +61,14 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("start web server: %s", err)
 		return
 	}
+	err := startHtml()
+	if err != nil {
+		log.Errorf("[startHtml] error: %s", err)
+		return
+	}
 	waitToExit()
 }
+
 
 func initLog(ctx *cli.Context) {
 	//init log module
@@ -93,4 +101,22 @@ func waitToExit() {
 		}
 	}()
 	<-exit
+}
+
+func startHtml() error {
+	curPath, err := os.Getwd()
+	if err != nil {
+		log.Errorf("Getwd error:%s",err)
+		return err
+	}
+	pagePath := filepath.Join(curPath,"web", "index.html")
+	log.Infof("pagePath:%s", pagePath)
+	go func() {
+		err := http.ListenAndServe(":8080", http.FileServer(http.Dir(pagePath)))
+		if err != nil {
+			log.Errorf("[startHtml] ListenAndServe error:%s", err)
+			return
+		}
+	}()
+	return nil
 }

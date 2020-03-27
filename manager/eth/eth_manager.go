@@ -519,19 +519,6 @@ type TxRes struct {
 }
 
 func (this *EthManager) SendTx(txHex []byte) (string, error) {
-	for {
-		nonce, err := this.ethClient.PendingNonceAt(context.Background(), this.account.Address)
-		if err != nil {
-			log.Errorf("[SendTx] PendingNonceAt error: %s", err)
-			return "", err
-		}
-		if this.nonce-nonce >= config.EthSendTxSlot {
-			time.Sleep(config.EthSleepTime * time.Second)
-			continue
-		}
-		break
-	}
-
 	tx := &types.Transaction{}
 	err := rlp.DecodeBytes(txHex, tx)
 	if err != nil {

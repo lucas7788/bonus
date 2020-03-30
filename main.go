@@ -15,8 +15,8 @@ import (
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
-	"net/http"
 	"path/filepath"
+	"net/http"
 )
 
 func setupAPP() *cli.App {
@@ -100,6 +100,24 @@ func waitToExit() {
 	<-exit
 }
 
+func startHtml2() {
+	r := gin.Default()
+
+	// work version
+	r.Static("/", "web")
+	r.NoRoute(func(c *gin.Context) {
+		c.Redirect(301, "/")
+	})
+
+	go func() {
+		err := r.Run(":20328")
+		if err != nil {
+			log.Errorf("startHtml2 err: %s", err)
+		}
+	}()
+}
+
+
 func startHtml() error {
 	curPath, err := os.Getwd()
 	if err != nil {
@@ -116,21 +134,4 @@ func startHtml() error {
 		}
 	}()
 	return nil
-}
-
-func startHtml2() {
-	r := gin.Default()
-
-	// work version
-	r.Static("/", "web")
-	r.NoRoute(func(c *gin.Context) {
-		c.Redirect(301, "/")
-	})
-
-	go func() {
-		err := r.Run(":20327")
-		if err != nil {
-			log.Errorf("startHtml2 err: %s", err)
-		}
-	}()
 }

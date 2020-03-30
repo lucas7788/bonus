@@ -63,7 +63,6 @@ func GetAdminBalanceByEventType(ctx *routing.Context) error {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 	}
-
 	return writeResponse(ctx, ResponseSuccess(adminBalance))
 }
 

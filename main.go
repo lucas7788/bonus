@@ -15,6 +15,8 @@ import (
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
+	"os/exec"
+	"time"
 )
 
 func setupAPP() *cli.App {
@@ -62,6 +64,9 @@ func startBonus(ctx *cli.Context) {
 	}
 	startHtml()
 	log.Info("startHtml success")
+	time.Sleep(3 * time.Second)
+	openBrowser("http://127.0.0.1:20328")
+	log.Infof("Please open: %s in browser", "http://127.0.0.1:20328")
 	waitToExit()
 }
 
@@ -113,4 +118,20 @@ func startHtml() {
 			log.Errorf("startHtml err: %s", err)
 		}
 	}()
+}
+
+func openBrowser(uri string) error {
+	var commands = map[string]string{
+		"windows": "cmd /c start",
+		"darwin":  "open",
+		"linux":   "xdg-open",
+	}
+
+	run, ok := commands[runtime.GOOS]
+	if !ok {
+		return fmt.Errorf("don't know how to open things on %s platform", runtime.GOOS)
+	}
+
+	cmd := exec.Command(run, uri)
+	return cmd.Start()
 }

@@ -15,8 +15,6 @@ import (
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
-	"path/filepath"
-	"net/http"
 )
 
 func setupAPP() *cli.App {
@@ -62,7 +60,7 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("start web server: %s", err)
 		return
 	}
-	startHtml2()
+	startHtml()
 	log.Info("startHtml success")
 	waitToExit()
 }
@@ -100,7 +98,7 @@ func waitToExit() {
 	<-exit
 }
 
-func startHtml2() {
+func startHtml() {
 	r := gin.Default()
 
 	// work version
@@ -112,26 +110,7 @@ func startHtml2() {
 	go func() {
 		err := r.Run(":20328")
 		if err != nil {
-			log.Errorf("startHtml2 err: %s", err)
+			log.Errorf("startHtml err: %s", err)
 		}
 	}()
-}
-
-
-func startHtml() error {
-	curPath, err := os.Getwd()
-	if err != nil {
-		log.Errorf("Getwd error:%s", err)
-		return err
-	}
-	pagePath := filepath.Join(curPath, "web", "index.html")
-	log.Infof("pagePath:%s", pagePath)
-	go func() {
-		err := http.ListenAndServe(":8080", http.FileServer(http.Dir(pagePath)))
-		if err != nil {
-			log.Errorf("[startHtml] ListenAndServe error:%s", err)
-			return
-		}
-	}()
-	return nil
 }

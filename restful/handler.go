@@ -15,7 +15,7 @@ import (
 )
 
 var DefBonusMap = new(sync.Map) // evttype + nettype -> withdraw-mgr
-// tokentype + "_" + evttype -> event
+// evttype -> TokenType
 
 func UploadExcel(ctx *routing.Context) error {
 	excelParam, errCode := ParseExcelParam(ctx)
@@ -23,8 +23,7 @@ func UploadExcel(ctx *routing.Context) error {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
 
-	eventName := excelParam.TokenType + "_" + excelParam.EventType
-	if _, exist := DefBonusMap.Load(eventName); exist {
+	if _, exist := DefBonusMap.Load(excelParam.EventType); exist {
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
 
@@ -47,7 +46,7 @@ func UploadExcel(ctx *routing.Context) error {
 		log.Errorf("Store error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
-	DefBonusMap.Store(eventName, nil)
+	DefBonusMap.Store(excelParam.EventType, excelParam.TokenType)
 	DefBonusMap.Store(excelParam.EventType+excelParam.NetType, mgr)
 	return writeResponse(ctx, ResponseSuccess(excelParam))
 }
@@ -304,27 +303,21 @@ func loadAllHistoryEvents() error {
 	}
 
 	for _, eventdir := range eventdirs {
-		if _, ok := DefBonusMap.Load(eventdir); ok {
+		strArr := strings.Split(eventdir, "_") // TokenType, EventType
+		if _, ok := DefBonusMap.Load(strArr[1]); ok {
 			// reset bouns map
 			DefBonusMap = new(sync.Map)
 			return fmt.Errorf("dupliate event: %s", eventdir)
 		}
-		DefBonusMap.Store(eventdir, nil)
+		DefBonusMap.Store(strArr[1], strArr[0])
 	}
 	return nil
 }
 
 func getTokenManager(eventType, netType string) (interfaces.WithdrawManager, int64) {
-	tokenType := ""
-	for _, t := range config.SupportedTokenTypes {
-		eventName := t + "_" + eventType
-		if _, exist := DefBonusMap.Load(eventName); exist {
-			tokenType = t
-			break
-		}
 
-	}
-	if tokenType == "" {
+	tokenTy, ok := DefBonusMap.Load(eventType)
+	if !ok || tokenTy == nil {
 		return nil, NoTheEventTypeError
 	}
 
@@ -335,7 +328,7 @@ func getTokenManager(eventType, netType string) (interfaces.WithdrawManager, int
 		}
 		return mgr, SUCCESS
 	}
-
+	tokenType := tokenTy.(string)
 	mgr, err := manager.RecoverManager(tokenType, eventType, netType)
 	if err != nil {
 		log.Errorf("CreateManager error: %s", err)

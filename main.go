@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/gin-gonic/gin"
 	"github.com/ontio/bonus/cmd"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
@@ -14,8 +15,8 @@ import (
 	"github.com/ontio/bonus/restful"
 	"github.com/ontio/ontology/common/log"
 	"github.com/urfave/cli"
-	"path/filepath"
 	"net/http"
+	"path/filepath"
 )
 
 func setupAPP() *cli.App {
@@ -61,15 +62,10 @@ func startBonus(ctx *cli.Context) {
 		log.Errorf("start web server: %s", err)
 		return
 	}
-	err := startHtml()
-	if err != nil {
-		log.Errorf("[startHtml] error: %s", err)
-		return
-	}
+	startHtml2()
 	log.Info("startHtml success")
 	waitToExit()
 }
-
 
 func initLog(ctx *cli.Context) {
 	//init log module
@@ -107,10 +103,10 @@ func waitToExit() {
 func startHtml() error {
 	curPath, err := os.Getwd()
 	if err != nil {
-		log.Errorf("Getwd error:%s",err)
+		log.Errorf("Getwd error:%s", err)
 		return err
 	}
-	pagePath := filepath.Join(curPath,"web", "index.html")
+	pagePath := filepath.Join(curPath, "web", "index.html")
 	log.Infof("pagePath:%s", pagePath)
 	go func() {
 		err := http.ListenAndServe(":8080", http.FileServer(http.Dir(pagePath)))
@@ -120,4 +116,21 @@ func startHtml() error {
 		}
 	}()
 	return nil
+}
+
+func startHtml2() {
+	r := gin.Default()
+
+	// work version
+	r.Static("/", "web")
+	r.NoRoute(func(c *gin.Context) {
+		c.Redirect(301, "/")
+	})
+
+	go func() {
+		err := r.Run(":20327")
+		if err != nil {
+			log.Errorf("startHtml2 err: %s", err)
+		}
+	}()
 }

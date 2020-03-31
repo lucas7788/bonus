@@ -122,7 +122,7 @@ func startHtml() {
 
 func openBrowser(uri string) error {
 	var commands = map[string]string{
-		"windows": "cmd /c start",
+		"windows": "start",
 		"darwin":  "open",
 		"linux":   "xdg-open",
 	}

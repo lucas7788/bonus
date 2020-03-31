@@ -65,7 +65,10 @@ func startBonus(ctx *cli.Context) {
 	startHtml()
 	log.Info("startHtml success")
 	time.Sleep(3 * time.Second)
-	openBrowser("http://127.0.0.1:20328")
+	err := openBrowser("http://127.0.0.1:20328")
+	if err != nil {
+		log.Infof("openBrowser failed: %s", err)
+	}
 	log.Infof("Please open: %s in browser", "http://127.0.0.1:20328")
 	waitToExit()
 }
@@ -131,7 +134,11 @@ func openBrowser(uri string) error {
 	if !ok {
 		return fmt.Errorf("don't know how to open things on %s platform", runtime.GOOS)
 	}
-
-	cmd := exec.Command(run, uri)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command(`cmd`, `/c`, `start`, `http://127.0.0.1:20328`)
+	} else {
+		cmd = exec.Command(run, uri)
+	}
 	return cmd.Start()
 }

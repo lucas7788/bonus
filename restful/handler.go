@@ -101,7 +101,7 @@ func SetGasPrice(ctx *routing.Context) error {
 func Stop(ctx *routing.Context) error {
 	evtty, netty, errCode := ParseTransferParam(ctx)
 	if errCode != SUCCESS {
-		writeResponse(ctx, ResponsePack(errCode))
+		return writeResponse(ctx, ResponsePack(errCode))
 	}
 	mgr, errCode := getTokenManager(evtty, netty)
 	if errCode != SUCCESS {

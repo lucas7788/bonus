@@ -445,3 +445,30 @@ http://127.0.0.1:8080/api/v1/gettxinfo/ssserc20/testnet/1/10
     "Version": "1.0.0"
 }
 ```
+
+12. 转帐 POST
+`http://127.0.0.1:8080/api/v1/stop`
+
+参数
+```
+{
+	"id": 1,
+    "jsonrpc": "2.0",
+    "method": "transfer",
+    "params": {
+    	"eventType":"ssserc20",
+    	"netType":"testnet"
+    }
+}
+```
+
+响应
+```
+{
+    "Action": "",
+    "Desc": "SUCCESS",
+    "Error": 1,
+    "Result": "",
+    "Version": "1.0.0"
+}
+```

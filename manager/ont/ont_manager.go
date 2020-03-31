@@ -226,7 +226,7 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 	fee := new(big.Int).SetUint64(uint64(10000000)) // 0.01
 	ongBalance := utils.ToIntByPrecise(bal[config.ONG], config.ONG_DECIMALS)
 	if ongBalance.Cmp(fee) < 0 {
-		return nil
+		return fmt.Errorf("ong balance is not enough for fee")
 	}
 
 	var amt string

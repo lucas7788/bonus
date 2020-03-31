@@ -187,6 +187,7 @@ func (self *OntManager) VerifyAddress(address string) bool {
 }
 
 func (self *OntManager) StartTransfer() {
+	self.StartHandleTxTask()
 	go func() {
 		self.txHandleTask.UpdateTxInfoTable(self, self.excel)
 		for _, trParam := range self.excel.BillList {

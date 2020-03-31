@@ -22,6 +22,7 @@ type WithdrawManager interface {
 	GetTotal() int
 	GetExcelParam() *common.ExcelParam
 	Store() error
+	Stop()
 	CloseDB()
 	QueryTransferProgress() (map[string]int, error)
 	QueryTxInfo(start, end int, txResult common.TxResult) ([]*common.TransactionInfo, int, error)

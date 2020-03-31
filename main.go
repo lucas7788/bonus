@@ -64,7 +64,7 @@ func startBonus(ctx *cli.Context) {
 	}
 	startHtml()
 	log.Info("startHtml success")
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 	err := openBrowser("http://127.0.0.1:20328")
 	if err != nil {
 		log.Infof("openBrowser failed: %s", err)

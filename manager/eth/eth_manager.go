@@ -237,7 +237,6 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 			return nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
 		}
 		res[self.excel.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
-
 	}
 	ethBalance, err := self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
 	if err != nil {
@@ -267,6 +266,10 @@ func (this *EthManager) GetTotal() int {
 	return len(this.excel.BillList)
 }
 
+func (self *EthManager) Stop() {
+	self.txHandleTask.StopChan <- true
+}
+
 func (self *EthManager) ComputeSum() (string, error) {
 	// TODO: SUPPORT ETH
 	if self.excel.TokenType == config.ERC20 {
@@ -288,14 +291,34 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 	var amt string
 	if tokenType == config.ERC20 {
 		amt = allBalances[config.ERC20]
+		if amt == "" {
+			return fmt.Errorf("erc20 balance is 0")
+		}
+		feeStr, err := self.EstimateFee(config.ERC20, 1)
+		if err != nil {
+			return err
+		}
+		fee := utils.ToIntByPrecise(feeStr, config.ETH_DECIMALS)
+
+		ethBalance := allBalances[config.ETH]
+		ethBa := utils.ToIntByPrecise(ethBalance, config.ETH_DECIMALS)
+		if ethBa.Cmp(fee) <= 0 {
+			return fmt.Errorf("not enough eth")
+		}
 	} else if tokenType == config.ETH {
 		ba := allBalances[config.ETH]
+		if ba == "" {
+			return fmt.Errorf("eth balance is 0")
+		}
 		baBig := utils.ToIntByPrecise(ba, config.ETH_DECIMALS)
 		feeStr, err := self.EstimateFee(config.ETH, 1)
 		if err != nil {
 			return err
 		}
 		fee := utils.ToIntByPrecise(feeStr, config.ETH_DECIMALS)
+		if baBig.Cmp(fee) <= 0 {
+			return fmt.Errorf("not enough eth")
+		}
 		amtBig := new(big.Int).Sub(baBig, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)
 	}
@@ -346,7 +369,13 @@ func (self *EthManager) StartTransfer() {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
-			self.txHandleTask.TransferQueue <- trParam
+			select {
+			case self.txHandleTask.TransferQueue <- trParam:
+			case <-self.txHandleTask.CloseChan:
+				break
+			case <-self.txHandleTask.StopChan:
+				break
+			}
 		}
 		close(self.txHandleTask.TransferQueue)
 		self.txHandleTask.WaitClose()

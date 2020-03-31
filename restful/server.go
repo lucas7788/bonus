@@ -9,6 +9,7 @@ const (
 	POST_TRANSFER      = "/api/v1/transfer"
 	POST_WITHDRAW      = "/api/v1/withdraw"
 	POST_SET_GAS_PRICE = "/api/v1/setgasprice"
+	POST_STOP = "/api/v1/stop"
 
 	GET_EVENT_TYPE                  = "/api/v1/getevtty"
 	GET_GAS_PRICE                   = "/api/v1/getgasprice/<evtty>/<netty>"
@@ -25,6 +26,7 @@ func InitRouter() *routing.Router {
 	router.Post(POST_TRANSFER, Transfer)
 	router.Post(POST_WITHDRAW, Withdraw)
 	router.Post(POST_SET_GAS_PRICE, SetGasPrice)
+	router.Post(POST_STOP, )
 
 	router.Get(Get_TxInfo_BY_EVENT_TYPE, GetTxInfoByEventType)
 	router.Get(GET_EVENT_TYPE, GetEventType)

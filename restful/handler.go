@@ -98,6 +98,23 @@ func SetGasPrice(ctx *routing.Context) error {
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
+func Stop(ctx *routing.Context) error {
+	evtty, netty, errCode := ParseTransferParam(ctx)
+	if errCode != SUCCESS {
+		writeResponse(ctx, ResponsePack(errCode))
+	}
+	mgr, errCode := getTokenManager(evtty, netty)
+	if errCode != SUCCESS {
+		return writeResponse(ctx, ResponsePack(errCode))
+	}
+	status := mgr.GetStatus()
+	if status != common.Transfering {
+		return writeResponse(ctx, ResponsePack(ShouldBeTransfering))
+	}
+	mgr.Stop()
+	return writeResponse(ctx, ResponsePack(SUCCESS))
+}
+
 func Transfer(ctx *routing.Context) error {
 	eventType, netType, errCode := ParseTransferParam(ctx)
 	if errCode != SUCCESS {

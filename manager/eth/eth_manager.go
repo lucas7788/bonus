@@ -360,12 +360,11 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
-func (self *EthManager) StartHandleTxTask() error {
+func (self *EthManager) StartHandleTxTask() {
 	//start transfer task and verify task
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
 	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
-	return nil
 }
 
 func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {

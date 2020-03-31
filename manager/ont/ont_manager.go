@@ -218,7 +218,7 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
-func (self *OntManager) StartHandleTxTask() error {
+func (self *OntManager) StartHandleTxTask() {
 	txHandleTask := transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE)
 	self.txHandleTask = txHandleTask
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)

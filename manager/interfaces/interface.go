@@ -9,7 +9,7 @@ type WithdrawManager interface {
 	SendTx(txHex []byte) (string, error)
 	VerifyTx(txHash string, retryLimit int) (bool, error)
 	StartTransfer()
-	StartHandleTxTask() error
+	StartHandleTxTask()
 	GetAdminAddress() string
 	EstimateFee(tokenType string, total int) (string, error)
 	GetTxTime(txHash string) (uint32, error)

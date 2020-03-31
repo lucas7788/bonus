@@ -244,7 +244,7 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, pageSize in
 		if start == 0 && pageSize == 0 {
 			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?"
 		} else {
-			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?  order by id DESC limit ?, ?"
+			strSql = "select Id, TokenType,NetType,ContractAddress,Address,Amount,TxHash,TxTime,TxResult,ErrorDetail from bonus_transaction_info where EventType = ?  order by id limit ?, ?"
 		}
 	} else {
 		if start == 0 && pageSize == 0 {

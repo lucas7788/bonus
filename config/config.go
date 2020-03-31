@@ -1,9 +1,9 @@
 package config
 
 import (
-	"math/big"
 	"github.com/ontio/bonus/utils"
 	"github.com/ontio/ontology/common/log"
+	"math/big"
 )
 
 var Version = ""

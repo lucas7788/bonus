@@ -149,7 +149,7 @@ type EthPersistHelper struct {
 }
 
 func (this *EthManager) Store() error {
-	for _,item := range this.excel.BillList {
+	for _, item := range this.excel.BillList {
 		if !this.VerifyAddress(item.Address) {
 			return fmt.Errorf("invalid address: %s", item.Address)
 		}
@@ -386,8 +386,7 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	if (this.excel.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
 		withdrawAmount := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
 		if ethBalance.Cmp(withdrawAmount) < 0 {
-			return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
-				utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
+			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
 		}
 		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.TokenType,
 			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
@@ -403,8 +402,7 @@ func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.excel.ContractAddress, err)
 		}
 		if balance.Cmp(withdrawAmount) < 0 {
-			return "", nil, fmt.Errorf("Withdraw: self pending balance %s not enough, token %s",
-				utils.ToStringByPrecise(balance, erc20.Decimals), this.excel.ContractAddress)
+			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
 		}
 		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
 		return this.newWithdrawErc20Tx(erc20.ContractAddr, to, withdrawAmount, DEFAULT_GAS_PRICE)

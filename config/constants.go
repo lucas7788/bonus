@@ -30,4 +30,5 @@ const (
 
 var (
 	SupportedTokenTypes = []string{ONT, ONG, OEP4, ETH, ERC20}
+	InSufficientBalance = "Balance is not enough"
 )

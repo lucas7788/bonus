@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/ontio/bonus/config"
+	"github.com/ontio/ontology/common/log"
 	"io/ioutil"
 	"strings"
-	"github.com/ontio/ontology/common/log"
 )
 
 func PathExists(path string) bool {
@@ -55,7 +55,7 @@ func GetEventDBFilename(net, tokenType, eventType string) string {
 	return filepath.Join(GetEventDir(tokenType, eventType), net, net+".db")
 }
 
-func ClearData(netty, tokenty,evtty string) {
+func ClearData(netty, tokenty, evtty string) {
 	dbFileName := GetEventDBFilename(netty, tokenty, evtty)
 	if PathExists(dbFileName) {
 		err := os.Remove(dbFileName)
@@ -72,7 +72,6 @@ func ClearData(netty, tokenty,evtty string) {
 		}
 	}
 }
-
 
 //
 // return { "ONT/ONG/OEP4/ETH/ERC20" + event-name }

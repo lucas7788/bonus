@@ -23,7 +23,7 @@ type TxHandleTask struct {
 	TransferStatus     common.TransferStatus
 	TokenType          string
 	db                 *bonus_db.BonusDB
-	StopChan chan bool
+	StopChan           chan bool
 }
 
 type VerifyParam struct {
@@ -42,7 +42,7 @@ func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *T
 		TransferStatus: common.Transfering,
 		CloseChan:      make(chan bool),
 		waitVerify:     make(chan bool),
-		StopChan:make(chan bool),
+		StopChan:       make(chan bool),
 		TokenType:      tokenType,
 		db:             db,
 	}
@@ -150,6 +150,10 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 			if txHex == nil {
 				var txHash string
 				txHash, txHex, err = mana.NewWithdrawTx(param.Address, param.Amount, "")
+				if err != nil && strings.Contains(err.Error(), config.InSufficientBalance) {
+					self.exit()
+					return
+				}
 				if err != nil || txHash == "" || txHex == nil {
 					log.Errorf("Build Transfer Tx failed,address: %s,txHash: %s, err: %s", param.Address, txHash, err)
 					err := self.db.UpdateTxResult(eventType, param.Address, param.Id, common.BuildTxFailed, 0, err.Error())

@@ -22,8 +22,8 @@ func UploadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-    if strings.Contains(excelParam.EventType, "_") {
-    	return writeResponse(ctx, ResponsePack(EventTypeNameError))
+	if strings.Contains(excelParam.EventType, "_") {
+		return writeResponse(ctx, ResponsePack(EventTypeNameError))
 	}
 	if _, exist := DefBonusMap.Load(excelParam.EventType); exist {
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
@@ -276,8 +276,6 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	r["Result"] = res
 	return writeResponse(ctx, r)
 }
-
-
 
 func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelParam) int64 {
 	var err error

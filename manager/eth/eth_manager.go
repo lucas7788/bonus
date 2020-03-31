@@ -369,6 +369,31 @@ func (self *EthManager) StartTransfer() {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
+			var amt, balance *big.Int
+			if self.excel.TokenType == config.ETH {
+				amt = utils.ToIntByPrecise(trParam.Amount, config.ETH_DECIMALS)
+				balance, err = self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
+				if err != nil {
+					log.Errorf("[StartTransfer] PendingBalanceAt failed: %s", err)
+					break
+				}
+			} else if self.excel.TokenType == config.ERC20 {
+				erc20, ok := self.tokens[self.excel.ContractAddress]
+				if !ok || erc20 == nil {
+					log.Errorf("[StartTransfer]Withdraw: token %s not exist", self.excel.ContractAddress)
+					break
+				}
+				amt = utils.ToIntByPrecise(trParam.Amount, config.ETH_DECIMALS)
+				balance, err = erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
+				if err != nil {
+					fmt.Errorf("[StartTransfer] Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
+					break
+				}
+			}
+			if balance.Cmp(amt) <= 0 {
+				log.Errorf("[StartTransfer] not enough balance")
+				break
+			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
 			case <-self.txHandleTask.CloseChan:

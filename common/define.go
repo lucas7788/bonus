@@ -40,6 +40,7 @@ const (
 	NotTransfer TransferStatus = iota
 	Transfering
 	Transfered
+	Stop
 )
 
 type TxResult byte

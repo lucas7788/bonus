@@ -194,6 +194,7 @@ func (self *OntManager) StartTransfer() {
 			if trParam.Amount == "0" {
 				continue
 			}
+
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
 			case <-self.txHandleTask.CloseChan:
@@ -210,6 +211,7 @@ func (self *OntManager) StartTransfer() {
 
 func (self *OntManager) Stop() {
 	self.txHandleTask.StopChan <- true
+	self.txHandleTask.TransferStatus = common2.Stop
 }
 
 func (self *OntManager) GetStatus() common2.TransferStatus {
@@ -339,6 +341,43 @@ func (self *OntManager) NewBatchWithdrawTx(addrAndAmts [][]string) (string, []by
 	return h.ToHexString(), t.ToArray(), nil
 }
 
+func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
+	if tokenTy == config.ONT {
+		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
+		adminbalance, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
+		if err != nil {
+			return fmt.Errorf("[NewWithdrawTx] BalanceOf failed: %s", err)
+		}
+		if adminbalance < value {
+			return fmt.Errorf("%s", config.InSufficientBalance)
+		}
+	} else if tokenTy == config.ONG {
+		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
+		ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
+		if err != nil {
+			return fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
+		}
+		if ongBalance < value {
+			return fmt.Errorf("%s", config.InSufficientBalance)
+		}
+	} else if tokenTy == config.OEP4 {
+		val := utils.ParseAssetAmount(amount, self.decimals)
+		value := new(big.Int).SetUint64(val)
+		res, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(self.contractAddress, []interface{}{"balanceOf", []interface{}{self.account.Address}})
+		if err != nil {
+			return fmt.Errorf("[NewWithdrawTx] oep4 BalanceOf failed:%s", err)
+		}
+		oep4Balance, err := res.Result.ToInteger()
+		if err != nil {
+			return err
+		}
+		if oep4Balance.Cmp(value) < 0 {
+			return fmt.Errorf("%s", config.InSufficientBalance)
+		}
+	}
+	return fmt.Errorf("not supprt tokentype: %s", tokenTy)
+}
+
 func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {
 	address, err := common.AddressFromBase58(destAddr)
 	if err != nil {
@@ -347,12 +386,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
-		adminbalance, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
-		if err != nil {
-			return "", nil, fmt.Errorf("[NewWithdrawTx] BalanceOf failed: %s", err)
-		}
-		if adminbalance < value {
-			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
+		if err = self.hasEnoughBalance(amount, config.ONT);err != nil {
+			return "", nil, err
 		}
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -374,12 +409,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
-		ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
-		if err != nil {
-			return "", nil, fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
-		}
-		if ongBalance < value {
-			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
+		if err = self.hasEnoughBalance(amount, config.ONG);err != nil {
+			return "", nil, err
 		}
 		var sts []ont.State
 		sts = append(sts, ont.State{
@@ -405,16 +436,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		}
 		val := utils.ParseAssetAmount(amount, self.decimals)
 		value := new(big.Int).SetUint64(val)
-		res, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(self.contractAddress, []interface{}{"balanceOf", []interface{}{self.account.Address}})
-		if err != nil {
-			return "", nil, fmt.Errorf("[NewWithdrawTx] oep4 BalanceOf failed:%s", err)
-		}
-		oep4Balance, err := res.Result.ToInteger()
-		if err != nil {
+		if err = self.hasEnoughBalance(amount, config.OEP4);err != nil {
 			return "", nil, err
-		}
-		if oep4Balance.Cmp(value) < 0 {
-			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
 		}
 
 		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, value}})

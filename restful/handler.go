@@ -128,6 +128,9 @@ func Transfer(ctx *routing.Context) error {
 	if mgr.GetStatus() == common.Transfering {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
+	if mgr.GetStatus() == common.Stop {
+		return writeResponse(ctx, ResponsePack(StopError))
+	}
 	mgr.StartTransfer()
 	log.Info("start transfer success")
 	return writeResponse(ctx, ResponsePack(SUCCESS))

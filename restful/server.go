@@ -26,7 +26,7 @@ func InitRouter() *routing.Router {
 	router.Post(POST_TRANSFER, Transfer)
 	router.Post(POST_WITHDRAW, Withdraw)
 	router.Post(POST_SET_GAS_PRICE, SetGasPrice)
-	router.Post(POST_STOP, )
+	router.Post(POST_STOP, Stop)
 
 	router.Get(Get_TxInfo_BY_EVENT_TYPE, GetTxInfoByEventType)
 	router.Get(GET_EVENT_TYPE, GetEventType)

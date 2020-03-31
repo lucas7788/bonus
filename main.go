@@ -114,12 +114,12 @@ func startHtml() {
 	r.NoRoute(func(c *gin.Context) {
 		c.Redirect(301, "/")
 	})
-
 	go func() {
 		err := r.Run(":20328")
 		if err != nil {
 			log.Errorf("startHtml err: %s", err)
 		}
+		log.Info("web server over")
 	}()
 }
 

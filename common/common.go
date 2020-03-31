@@ -6,16 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/ontio/bonus/config"
+	"io/ioutil"
+	"strings"
+	"github.com/ontio/ontology/common/log"
 )
-
-func IsHave(allStr []string, item string) bool {
-	for _, ind := range allStr {
-		if ind == item {
-			return true
-		}
-	}
-	return false
-}
 
 func PathExists(path string) bool {
 	_, err := os.Stat(path)
@@ -48,4 +42,57 @@ func IsTokenTypeSupported(token string) bool {
 		}
 	}
 	return false
+}
+
+func getBaseDir() string {
+	return filepath.Join(".", config.DBPath)
+}
+func GetEventDir(tokenType string, eventType string) string {
+	return filepath.Join(getBaseDir(), tokenType+"_"+eventType)
+}
+
+func GetEventDBFilename(net, tokenType, eventType string) string {
+	return filepath.Join(GetEventDir(tokenType, eventType), net, net+".db")
+}
+
+func ClearData(netty, tokenty,evtty string) {
+	dbFileName := GetEventDBFilename(netty, tokenty, evtty)
+	if PathExists(dbFileName) {
+		err := os.Remove(dbFileName)
+		if err != nil {
+			log.Errorf("[clearData] Remove dbFileName error:%s", err)
+		}
+	}
+	evtPath := GetEventDir(tokenty, evtty)
+	if PathExists(evtPath) {
+		log.Infof("removeall dir:%s", evtPath)
+		err := os.RemoveAll(evtPath)
+		if err != nil {
+			log.Errorf("[clearData] Remove evtdir error:%s", err)
+		}
+	}
+}
+
+
+//
+// return { "ONT/ONG/OEP4/ETH/ERC20" + event-name }
+//
+func GetAllEventDirs() ([]string, error) {
+	files, err := ioutil.ReadDir(getBaseDir())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read basedir: %s", err)
+	}
+	events := make([]string, 0)
+	for _, f := range files {
+		if f.IsDir() {
+			eventName := f.Name()
+			for _, tokenName := range config.SupportedTokenTypes {
+				if strings.HasPrefix(eventName, tokenName+"_") {
+					events = append(events, eventName)
+					break
+				}
+			}
+		}
+	}
+	return events, nil
 }

@@ -8,7 +8,6 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/ontio/bonus/common"
-	"github.com/ontio/bonus/config"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
 )
@@ -20,7 +19,7 @@ type BonusDB struct {
 }
 
 func NewBonusDB(tokenTy, evtTy, netTy string) (*BonusDB, error) {
-	dbFileName := config.GetEventDBFilename(netTy, tokenTy, evtTy)
+	dbFileName := common.GetEventDBFilename(netTy, tokenTy, evtTy)
 	if err := common.CheckPath(dbFileName); err != nil {
 		return nil, fmt.Errorf("failed to create %s: %s", dbFileName, err)
 	}

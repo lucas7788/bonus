@@ -23,6 +23,7 @@ type TxHandleTask struct {
 	TransferStatus     common.TransferStatus
 	TokenType          string
 	db                 *bonus_db.BonusDB
+	StopChan chan bool
 }
 
 type VerifyParam struct {
@@ -41,6 +42,7 @@ func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *T
 		TransferStatus: common.Transfering,
 		CloseChan:      make(chan bool),
 		waitVerify:     make(chan bool),
+		StopChan:make(chan bool),
 		TokenType:      tokenType,
 		db:             db,
 	}
@@ -144,7 +146,6 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 					continue
 				}
 			}
-
 			//build tx
 			if txHex == nil {
 				var txHash string
@@ -165,7 +166,6 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				}
 				log.Infof("txHash:%s, txHex:%s, address:%s, amount:%s", txHash, common2.ToHexString(txHex), param.Address, param.Amount)
 			}
-
 			//send tx
 			retry := 0
 			var hash string

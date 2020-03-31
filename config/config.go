@@ -1,12 +1,7 @@
 package config
 
 import (
-	"fmt"
-	"io/ioutil"
 	"math/big"
-	"path/filepath"
-	"strings"
-
 	"github.com/ontio/bonus/utils"
 	"github.com/ontio/ontology/common/log"
 )
@@ -76,38 +71,4 @@ type Eth struct {
 type EthToken struct {
 	TokenName    string `json:"token_name"`
 	ContractAddr string `json:"contract_addr"`
-}
-
-func getBaseDir() string {
-	return filepath.Join(".", DBPath)
-}
-func GetEventDir(tokenType string, eventType string) string {
-	return filepath.Join(getBaseDir(), tokenType+"_"+eventType)
-}
-
-func GetEventDBFilename(net, tokenType, eventType string) string {
-	return filepath.Join(GetEventDir(tokenType, eventType), net, net+".db")
-}
-
-//
-// return { "ONT/ONG/OEP4/ETH/ERC20" + event-name }
-//
-func GetAllEventDirs() ([]string, error) {
-	files, err := ioutil.ReadDir(getBaseDir())
-	if err != nil {
-		return nil, fmt.Errorf("failed to read basedir: %s", err)
-	}
-	events := make([]string, 0)
-	for _, f := range files {
-		if f.IsDir() {
-			eventName := f.Name()
-			for _, tokenName := range SupportedTokenTypes {
-				if strings.HasPrefix(eventName, tokenName+"_") {
-					events = append(events, eventName)
-					break
-				}
-			}
-		}
-	}
-	return events, nil
 }

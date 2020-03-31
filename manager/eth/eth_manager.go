@@ -81,7 +81,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 	if err != nil {
 		return nil, err
 	}
-	walletDir := config.GetEventDir(eatp.TokenType, eatp.EventType)
+	walletDir := common2.GetEventDir(eatp.TokenType, eatp.EventType)
 	err = common2.CheckPath(walletDir)
 	if err != nil {
 		return nil, err
@@ -149,6 +149,11 @@ type EthPersistHelper struct {
 }
 
 func (this *EthManager) Store() error {
+	for _,item := range this.excel.BillList {
+		if !this.VerifyAddress(item.Address) {
+			return fmt.Errorf("invalid address: %s", item.Address)
+		}
+	}
 	helper := &EthPersistHelper{
 		Config:  this.cfg,
 		Request: this.excel,
@@ -157,7 +162,7 @@ func (this *EthManager) Store() error {
 	if err != nil {
 		return err
 	}
-	configFilename := filepath.Join(config.GetEventDir(this.excel.TokenType, this.excel.EventType), "config.json")
+	configFilename := filepath.Join(common2.GetEventDir(this.excel.TokenType, this.excel.EventType), "config.json")
 	if err := ioutil.WriteFile(configFilename, data, 0644); err != nil {
 		return err
 	}
@@ -165,7 +170,7 @@ func (this *EthManager) Store() error {
 }
 
 func LoadEthManager(tokenType, eventType string) (*config.Eth, *common2.ExcelParam, error) {
-	configFilename := filepath.Join(config.GetEventDir(tokenType, eventType), "config.json")
+	configFilename := filepath.Join(common2.GetEventDir(tokenType, eventType), "config.json")
 	data, err := ioutil.ReadFile(configFilename)
 	if err != nil {
 		return nil, nil, err
@@ -272,7 +277,7 @@ func (self *EthManager) ComputeSum() (string, error) {
 		}
 		return utils.ToStringByPrecise(sum, self.tokens[self.excel.ContractAddress].Decimals), nil
 	}
-	return "", fmt.Errorf("not supported token type: %s", self.excel.TokenType)
+	return "", fmt.Errorf("[ComputeSum]not supported token type: %s", self.excel.TokenType)
 }
 
 func (self *EthManager) WithdrawToken(address, tokenType string) error {
@@ -294,7 +299,7 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		amtBig := new(big.Int).Sub(baBig, fee)
 		amt = utils.ToStringByPrecise(amtBig, config.ETH_DECIMALS)
 	}
-	log.Infof("amt: %s, tokenType:%s", amt, tokenType)
+	log.Infof("[WithdrawToken] amt: %s, tokenType:%s", amt, tokenType)
 	nonce, err := self.ethClient.PendingNonceAt(context.Background(), self.account.Address)
 	if err != nil {
 		return fmt.Errorf("[WithdrawToken] fetch nonce failed, %s", err)
@@ -302,7 +307,7 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 	self.nonce = nonce
 	hash, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
 	if hash == "" || txHex == nil || err != nil {
-		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
+		return fmt.Errorf("[WithdrawToken] NewWithdrawTx failed, error: %s", err)
 	}
 	hash, err = self.SendTx(txHex)
 	if err != nil {
@@ -355,11 +360,12 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
-func (self *EthManager) StartHandleTxTask() {
+func (self *EthManager) StartHandleTxTask() error {
 	//start transfer task and verify task
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
 	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
 	go self.txHandleTask.StartVerifyTxTask(self)
+	return nil
 }
 
 func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {

@@ -22,7 +22,9 @@ func UploadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-
+    if strings.Contains(excelParam.EventType, "_") {
+    	return writeResponse(ctx, ResponsePack(EventTypeNameError))
+	}
 	if _, exist := DefBonusMap.Load(excelParam.EventType); exist {
 		return writeResponse(ctx, ResponsePack(DuplicateEventType))
 	}
@@ -31,6 +33,7 @@ func UploadExcel(ctx *routing.Context) error {
 
 	mgr, err := manager.CreateManager(excelParam, excelParam.NetType, nil)
 	if err != nil {
+		common.ClearData(excelParam.NetType, excelParam.TokenType, excelParam.EventType)
 		log.Errorf("CreateManager error: %s", err)
 		return writeResponse(ctx, ResponsePack(InitManagerError))
 	}
@@ -43,6 +46,7 @@ func UploadExcel(ctx *routing.Context) error {
 	// persist mgr to event-local json file
 	err = mgr.Store()
 	if err != nil {
+		common.ClearData(excelParam.NetType, excelParam.TokenType, excelParam.EventType)
 		log.Errorf("Store error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
@@ -143,7 +147,7 @@ func Withdraw(ctx *routing.Context) error {
 }
 
 func GetEventType(ctx *routing.Context) error {
-	eventdirs, err := config.GetAllEventDirs()
+	eventdirs, err := common.GetAllEventDirs()
 	if err != nil {
 		return writeResponse(ctx, QueryExcelParamByEventType)
 	}
@@ -273,6 +277,8 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 	return writeResponse(ctx, r)
 }
 
+
+
 func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelParam) int64 {
 	var err error
 	excelParam.Sum, err = mgr.ComputeSum()
@@ -296,7 +302,7 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 }
 
 func loadAllHistoryEvents() error {
-	eventdirs, err := config.GetAllEventDirs()
+	eventdirs, err := common.GetAllEventDirs()
 	if err != nil {
 		return err
 	}

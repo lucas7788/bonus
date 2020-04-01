@@ -1,8 +1,8 @@
 package common
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestClearData(t *testing.T) {
@@ -13,20 +13,20 @@ func TestClearData(t *testing.T) {
 	if err := CheckPath(dbFileName); err != nil {
 		return
 	}
-	ClearData(netty,tokenty,evtTy)
+	ClearData(netty, tokenty, evtTy)
 }
 
 func TestExcelParam_TrParamSort(t *testing.T) {
 	billList := make([]*TransferParam, 0)
-	for i:=10;i>0;i-- {
+	for i := 10; i > 0; i-- {
 		tp := &TransferParam{
-			Id:i,
+			Id: i,
 		}
 		billList = append(billList, tp)
 	}
 
 	ep := &ExcelParam{
-		BillList:billList,
+		BillList: billList,
 	}
 	fmt.Println(ep.BillList[0].Id)
 	ep.TrParamSort()

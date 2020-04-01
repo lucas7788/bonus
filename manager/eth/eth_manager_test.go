@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"time"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/ethclient"
+	common2 "github.com/ethereum/go-ethereum/common"
 )
 
 func TestEthManager_NewWithdrawTx(t *testing.T) {
@@ -22,7 +25,6 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 	res = res.Div(DEFAULT_GAS_PRICE, gwei)
 	fmt.Println(res)
 	eth := &config.Eth{
-		WorkingPath:    "../../wallets/eth",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
@@ -32,7 +34,7 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 		TokenType: config.ETH,
 		EventType: "test",
 	}
-	manager, err := NewEthManager(eth, eatp, config.TestNet)
+	manager, err := NewEthManager(eth, eatp, config.TestNet, nil)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
@@ -55,12 +57,11 @@ func TestEthManager_Withdraw(t *testing.T) {
 	//	//ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9",
 	//	}
 	eth := &config.Eth{
-		WorkingPath:    "../../wallets/eth",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
 
-	manager, err := NewEthManager(eth, nil, config.MainNet)
+	manager, err := NewEthManager(eth, nil, config.MainNet, nil)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
@@ -77,7 +78,7 @@ func TestEthManager_Withdraw(t *testing.T) {
 		return
 	}
 	fmt.Println("start verify tx:", time.Now().Second())
-	boo := manager.VerifyTx(hash, 6)
+	boo,_ := manager.VerifyTx(hash, 6)
 	if boo {
 		fmt.Println("tx success txhash:", txhash)
 	} else {
@@ -90,11 +91,10 @@ func TestNewEthManager(t *testing.T) {
 	//	TokenName:    config.ERC20,
 	//	ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"}
 	eth := &config.Eth{
-		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, err := NewEthManager(eth, nil, config.TestNet)
+	manager, err := NewEthManager(eth, nil, config.TestNet, nil)
 	assert.Nil(t, err)
 	assert.NotEqual(t, nil, manager)
 }
@@ -104,11 +104,10 @@ func TestEthManager_GetTxTime(t *testing.T) {
 	//	TokenName:    config.ERC20,
 	//	ContractAddr: "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"}
 	eth := &config.Eth{
-		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, _ := NewEthManager(eth, nil, config.TestNet)
+	manager, _ := NewEthManager(eth, nil, config.TestNet, nil)
 
 	ti, err := manager.GetTxTime("0x4df8e59e05a1f89cfa70b0db8d00c70e623cccbea07b53c36bc5b5ac041ca4f8")
 	assert.Nil(t, err)
@@ -122,7 +121,6 @@ func TestEthManager_GetTxTime(t *testing.T) {
 
 func TestEthManager_EstimateFee(t *testing.T) {
 	eth := &config.Eth{
-		WorkingPath: "./testdata2/wallets/eth",
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
@@ -144,7 +142,7 @@ func TestEthManager_EstimateFee(t *testing.T) {
 		Sum:             "",
 		AdminBalance:    nil,
 	}
-	manager, err := NewEthManager(eth, eatp, config.TestNet)
+	manager, err := NewEthManager(eth, eatp, config.TestNet, nil)
 	if err != nil {
 		fmt.Println("NewEthManager:", err)
 	}
@@ -153,4 +151,20 @@ func TestEthManager_EstimateFee(t *testing.T) {
 		fmt.Println("EstimateFee:", err)
 	}
 	fmt.Println("fee:", fee)
+}
+
+func TestErc20Caller_Decimals(t *testing.T) {
+	ethClient, err := ethclient.Dial("https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888")
+	contractAddr := common2.HexToAddress("0x5774ff7127824a8de1c51433d28e4f3c5ce4768f")
+	erc20, err := NewErc20(contractAddr, ethClient)
+	if err != nil {
+		fmt.Errorf("NewEthManager: new erc20 contract failed, token %s, err: %s", "", err)
+		return
+	}
+	decimals, err := erc20.Decimals(&bind.CallOpts{})
+	if err != nil {
+		 fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", "", err)
+		 return
+	}
+	fmt.Println("decimals:", decimals)
 }

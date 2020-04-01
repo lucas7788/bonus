@@ -48,8 +48,8 @@ var ErrMap = map[int64]string{
 	NotExistenceEvtType:         "NotExistenceEvtType",
 	SetGasPriceFailed:           "SetGasPriceFailed",
 	EventTypeNameError:          "EventTypeNameError",
-	ShouldBeTransfering:"ShouldBeTransfering",
-	StopError:"Stop",
+	ShouldBeTransfering:         "ShouldBeTransfering",
+	StopError:                   "Stop",
 }
 
 const (
@@ -80,6 +80,6 @@ const (
 	NotExistenceEvtType         = 40023
 	SetGasPriceFailed           = 40024
 	EventTypeNameError          = 40025
-	ShouldBeTransfering   = 40026
-	StopError = 40027
+	ShouldBeTransfering         = 40026
+	StopError                   = 40027
 )

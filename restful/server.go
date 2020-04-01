@@ -9,7 +9,7 @@ const (
 	POST_TRANSFER      = "/api/v1/transfer"
 	POST_WITHDRAW      = "/api/v1/withdraw"
 	POST_SET_GAS_PRICE = "/api/v1/setgasprice"
-	POST_STOP = "/api/v1/stop"
+	POST_STOP          = "/api/v1/stop"
 
 	GET_EVENT_TYPE                  = "/api/v1/getevtty"
 	GET_GAS_PRICE                   = "/api/v1/getgasprice/<evtty>/<netty>"

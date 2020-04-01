@@ -180,6 +180,7 @@ func LoadEthManager(tokenType, eventType string) (*config.Eth, *common2.ExcelPar
 	if err := json.Unmarshal(data, helper); err != nil {
 		return nil, nil, err
 	}
+	helper.Request.TrParamSort()
 	return helper.Config, helper.Request, nil
 }
 
@@ -357,6 +358,36 @@ func (this *EthManager) updateContractInfo(address string) error {
 	return nil
 }
 
+func (self *EthManager) hasEnoughBalance(amount string) error {
+	if self.excel.TokenType == config.ETH {
+		amt := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
+		balance, err := self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
+		if err != nil {
+			log.Errorf("[StartTransfer] PendingBalanceAt failed: %s", err)
+			return fmt.Errorf("[StartTransfer] PendingBalanceAt failed: %s", err)
+		}
+		baStr := utils.ToStringByPrecise(balance, config.ETH_DECIMALS)
+		if balance.Cmp(amt) < 0 {
+			return fmt.Errorf("[StartTransfer] not enough balance, balance: %s, amt: %s", baStr, amount)
+		}
+	} else if self.excel.TokenType == config.ERC20 {
+		erc20, ok := self.tokens[self.excel.ContractAddress]
+		if !ok || erc20 == nil {
+			return fmt.Errorf("[StartTransfer]Withdraw: token %s not exist", self.excel.ContractAddress)
+		}
+		amt := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
+		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
+		if err != nil {
+			return fmt.Errorf("[StartTransfer] Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
+		}
+		baStr := utils.ToStringByPrecise(balance, erc20.Decimals)
+		if balance.Cmp(amt) < 0 {
+			return fmt.Errorf("[StartTransfer] not enough balance, balance: %s, amt: %s", baStr, amount)
+		}
+	}
+	return nil
+}
+
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
@@ -369,36 +400,18 @@ func (self *EthManager) StartTransfer() {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
-			var amt, balance *big.Int
-			if self.excel.TokenType == config.ETH {
-				amt = utils.ToIntByPrecise(trParam.Amount, config.ETH_DECIMALS)
-				balance, err = self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
-				if err != nil {
-					log.Errorf("[StartTransfer] PendingBalanceAt failed: %s", err)
-					break
-				}
-			} else if self.excel.TokenType == config.ERC20 {
-				erc20, ok := self.tokens[self.excel.ContractAddress]
-				if !ok || erc20 == nil {
-					log.Errorf("[StartTransfer]Withdraw: token %s not exist", self.excel.ContractAddress)
-					break
-				}
-				amt = utils.ToIntByPrecise(trParam.Amount, config.ETH_DECIMALS)
-				balance, err = erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
-				if err != nil {
-					fmt.Errorf("[StartTransfer] Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
-					break
-				}
-			}
-			if balance.Cmp(amt) <= 0 {
-				log.Errorf("[StartTransfer] not enough balance")
-				break
+			if err = self.hasEnoughBalance(trParam.Amount); err != nil {
+				log.Errorf("[StartTransfer]hasEnoughBalance error: %s, id: %d", err, trParam.Id)
+				return
 			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
+				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
 			case <-self.txHandleTask.CloseChan:
+				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
 				break
 			case <-self.txHandleTask.StopChan:
+				log.Infof("[StartTransfer] stop, id: %d", trParam.Id)
 				break
 			}
 		}
@@ -583,7 +596,7 @@ func (this *EthManager) SendTx(txHex []byte) (string, error) {
 	}
 	err = this.ethClient.SendTransaction(context.Background(), tx)
 	if err != nil {
-		return "", fmt.Errorf("newTx: send tx %s failed, err: %s", tx.Hash().String(), err)
+		return "", fmt.Errorf("[SendTx] send tx %s failed, err: %s", tx.Hash().String(), err)
 	}
 	return tx.Hash().String(), nil
 }

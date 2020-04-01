@@ -9,6 +9,7 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"io/ioutil"
 	"strings"
+	"sort"
 )
 
 func PathExists(path string) bool {
@@ -27,6 +28,15 @@ func CheckPath(path string) error {
 	}
 
 	return nil
+}
+
+func (param *ExcelParam) TrParamSort() {
+	sort.Slice(param.BillList, func(i, j int) bool {
+		if param.BillList[i].Id < param.BillList[j].Id {
+			return true
+		}
+		return false
+	})
 }
 
 func (param *ExcelParam) ResetTransferListID() {

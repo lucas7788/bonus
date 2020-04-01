@@ -145,6 +145,7 @@ func LoadOntManager(tokenType, eventType string) (*config.Ont, *common2.ExcelPar
 	if err := json.Unmarshal(data, helper); err != nil {
 		return nil, nil, err
 	}
+	helper.Request.TrParamSort()
 	return helper.Config, helper.Request, nil
 }
 
@@ -194,12 +195,18 @@ func (self *OntManager) StartTransfer() {
 			if trParam.Amount == "0" {
 				continue
 			}
-
+			if err := self.hasEnoughBalance(trParam.Amount, self.excel.TokenType); err != nil {
+				log.Errorf("[StartTransfer] hasEnoughBalance error: %s", err)
+				return
+			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
+				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
 			case <-self.txHandleTask.CloseChan:
+				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
 				break
 			case <-self.txHandleTask.StopChan:
+				log.Infof("[StartTransfer] StopChan, id: %d", trParam.Id)
 				break
 			}
 		}
@@ -349,7 +356,7 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 			return fmt.Errorf("[NewWithdrawTx] BalanceOf failed: %s", err)
 		}
 		if adminbalance < value {
-			return fmt.Errorf("%s", config.InSufficientBalance)
+			return fmt.Errorf("%s, adminbalance: %d, value: %d", config.InSufficientBalance, adminbalance, value)
 		}
 	} else if tokenTy == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
@@ -357,8 +364,9 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 		if err != nil {
 			return fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
 		}
+
 		if ongBalance < value {
-			return fmt.Errorf("%s", config.InSufficientBalance)
+			return fmt.Errorf("%s, adminbalance: %d, value: %d", config.InSufficientBalance, ongBalance, value)
 		}
 	} else if tokenTy == config.OEP4 {
 		val := utils.ParseAssetAmount(amount, self.decimals)
@@ -371,8 +379,9 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 		if err != nil {
 			return err
 		}
+		ba := utils.ToStringByPrecise(oep4Balance, uint64(self.decimals))
 		if oep4Balance.Cmp(value) < 0 {
-			return fmt.Errorf("%s", config.InSufficientBalance)
+			return fmt.Errorf("%s, adminbalance: %s, value: %s", config.InSufficientBalance, ba, amount)
 		}
 	}
 	return fmt.Errorf("not supprt tokentype: %s", tokenTy)
@@ -386,7 +395,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
-		if err = self.hasEnoughBalance(amount, config.ONT);err != nil {
+		if err = self.hasEnoughBalance(amount, config.ONT); err != nil {
 			return "", nil, err
 		}
 		var sts []ont.State
@@ -409,7 +418,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
-		if err = self.hasEnoughBalance(amount, config.ONG);err != nil {
+		if err = self.hasEnoughBalance(amount, config.ONG); err != nil {
 			return "", nil, err
 		}
 		var sts []ont.State
@@ -436,7 +445,7 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 		}
 		val := utils.ParseAssetAmount(amount, self.decimals)
 		value := new(big.Int).SetUint64(val)
-		if err = self.hasEnoughBalance(amount, config.OEP4);err != nil {
+		if err = self.hasEnoughBalance(amount, config.OEP4); err != nil {
 			return "", nil, err
 		}
 

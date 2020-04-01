@@ -57,6 +57,7 @@ func IsTokenTypeSupported(token string) bool {
 func getBaseDir() string {
 	return filepath.Join(".", config.DBPath)
 }
+
 func GetEventDir(tokenType string, eventType string) string {
 	return filepath.Join(getBaseDir(), tokenType+"_"+eventType)
 }

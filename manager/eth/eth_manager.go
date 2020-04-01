@@ -413,7 +413,7 @@ func (self *EthManager) StartTransfer() {
 			}
 			if err = self.hasEnoughBalance(trParam.Amount); err != nil {
 				log.Errorf("[StartTransfer]hasEnoughBalance error: %s, id: %d", err, trParam.Id)
-				return
+				break loop
 			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:

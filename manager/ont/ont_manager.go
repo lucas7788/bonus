@@ -191,6 +191,7 @@ func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
 		self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+	loop:
 		for _, trParam := range self.excel.BillList {
 			if trParam.Amount == "0" {
 				continue
@@ -204,10 +205,10 @@ func (self *OntManager) StartTransfer() {
 				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
 			case <-self.txHandleTask.CloseChan:
 				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
-				break
+				break loop
 			case <-self.txHandleTask.StopChan:
 				log.Infof("[StartTransfer] StopChan, id: %d", trParam.Id)
-				break
+				break loop
 			}
 		}
 		// FIXME: remove the close if tx-timeout not handled
@@ -217,6 +218,12 @@ func (self *OntManager) StartTransfer() {
 }
 
 func (self *OntManager) Stop() {
+	if self.txHandleTask.TransferStatus != common2.Transfering {
+		return
+	}
+	if self.txHandleTask == nil {
+		return
+	}
 	self.txHandleTask.StopChan <- true
 	self.txHandleTask.TransferStatus = common2.Stop
 }

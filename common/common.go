@@ -8,8 +8,8 @@ import (
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/ontology/common/log"
 	"io/ioutil"
-	"strings"
 	"sort"
+	"strings"
 )
 
 func PathExists(path string) bool {

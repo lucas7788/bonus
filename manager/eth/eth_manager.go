@@ -257,6 +257,9 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	if err != nil {
 		return "", err
 	}
+	if total > 1 {
+		gaslimit = gaslimit * 2
+	}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
 	gas := new(big.Int).Mul(gasLimi, DEFAULT_GAS_PRICE)
 	gasTotal := new(big.Int).Mul(gas, new(big.Int).SetUint64(uint64(total)))
@@ -265,10 +268,6 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 
 func (this *EthManager) GetTotal() int {
 	return len(this.excel.BillList)
-}
-
-func (self *EthManager) Stop() {
-	self.txHandleTask.StopChan <- true
 }
 
 func (self *EthManager) ComputeSum() (string, error) {
@@ -388,6 +387,17 @@ func (self *EthManager) hasEnoughBalance(amount string) error {
 	return nil
 }
 
+func (self *EthManager) Stop() {
+	if self.txHandleTask.TransferStatus != common2.Transfering {
+		return
+	}
+	if self.txHandleTask == nil {
+		return
+	}
+	self.txHandleTask.StopChan <- true
+	self.txHandleTask.TransferStatus = common2.Stop
+}
+
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
@@ -396,6 +406,7 @@ func (self *EthManager) StartTransfer() {
 			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
 			return
 		}
+	loop:
 		for _, trParam := range self.excel.BillList {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
@@ -409,10 +420,10 @@ func (self *EthManager) StartTransfer() {
 				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
 			case <-self.txHandleTask.CloseChan:
 				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
-				break
+				break loop
 			case <-self.txHandleTask.StopChan:
 				log.Infof("[StartTransfer] stop, id: %d", trParam.Id)
-				break
+				break loop
 			}
 		}
 		close(self.txHandleTask.TransferQueue)

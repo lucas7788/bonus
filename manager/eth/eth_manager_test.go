@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	common2 "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"time"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/ethclient"
-	common2 "github.com/ethereum/go-ethereum/common"
 )
 
 func TestEthManager_NewWithdrawTx(t *testing.T) {
@@ -78,7 +78,7 @@ func TestEthManager_Withdraw(t *testing.T) {
 		return
 	}
 	fmt.Println("start verify tx:", time.Now().Second())
-	boo,_ := manager.VerifyTx(hash, 6)
+	boo, _ := manager.VerifyTx(hash, 6)
 	if boo {
 		fmt.Println("tx success txhash:", txhash)
 	} else {
@@ -163,8 +163,8 @@ func TestErc20Caller_Decimals(t *testing.T) {
 	}
 	decimals, err := erc20.Decimals(&bind.CallOpts{})
 	if err != nil {
-		 fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", "", err)
-		 return
+		fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", "", err)
+		return
 	}
 	fmt.Println("decimals:", decimals)
 }

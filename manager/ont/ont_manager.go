@@ -198,7 +198,7 @@ func (self *OntManager) StartTransfer() {
 			}
 			if err := self.hasEnoughBalance(trParam.Amount, self.excel.TokenType); err != nil {
 				log.Errorf("[StartTransfer] hasEnoughBalance error: %s", err)
-				return
+				break loop
 			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
@@ -365,6 +365,7 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 		if adminbalance < value {
 			return fmt.Errorf("%s, adminbalance: %d, value: %d", config.InSufficientBalance, adminbalance, value)
 		}
+		return nil
 	} else if tokenTy == config.ONG {
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
 		ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
@@ -375,6 +376,7 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 		if ongBalance < value {
 			return fmt.Errorf("%s, adminbalance: %d, value: %d", config.InSufficientBalance, ongBalance, value)
 		}
+		return nil
 	} else if tokenTy == config.OEP4 {
 		val := utils.ParseAssetAmount(amount, self.decimals)
 		value := new(big.Int).SetUint64(val)
@@ -390,6 +392,7 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 		if oep4Balance.Cmp(value) < 0 {
 			return fmt.Errorf("%s, adminbalance: %s, value: %s", config.InSufficientBalance, ba, amount)
 		}
+		return nil
 	}
 	return fmt.Errorf("not supprt tokentype: %s", tokenTy)
 }

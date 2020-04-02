@@ -50,8 +50,9 @@ func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *T
 	}
 }
 
-func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eatp *common.ExcelParam) error {
+func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eatp *common.ExcelParam) (map[int]bool, error) {
 	txInfos := make([]*common.TransactionInfo, 0)
+	hasBuildTxId := make(map[int]bool)
 	//update tx info table
 	for _, trParam := range eatp.BillList {
 		tx, err := this.db.QueryTxHexByExcelAndAddr(eatp.EventType, trParam.Address, trParam.Id)
@@ -71,16 +72,18 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 				TxResult:        common.NotBuild,
 			}
 			txInfos = append(txInfos, txInfo)
+		} else {
+			hasBuildTxId[tx.Id] = true
 		}
 	}
 	if len(txInfos) > 0 {
 		err := this.db.InsertTxInfoSql(txInfos)
 		if err != nil {
 			log.Errorf("InsertTxInfoSql error:%s", err)
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return hasBuildTxId, nil
 }
 
 func (self *TxHandleTask) WaitClose() {

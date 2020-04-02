@@ -37,7 +37,7 @@ type OntManager struct {
 	contractAddress common.Address
 	decimals        int
 	txHandleTask    *transfer.TxHandleTask
-	stopChan chan bool
+	stopChan        chan bool
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*OntManager, error) {
@@ -92,13 +92,13 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
 	mgr := &OntManager{
-		cfg:     cfg,
-		excel:   eatp,
-		netType: netType,
-		db:      db,
-		account: acct,
-		ontSdk:  ontSdk,
-		stopChan:make(chan bool),
+		cfg:      cfg,
+		excel:    eatp,
+		netType:  netType,
+		db:       db,
+		account:  acct,
+		ontSdk:   ontSdk,
+		stopChan: make(chan bool),
 	}
 
 	if mgr.excel.ContractAddress != "" {
@@ -192,15 +192,23 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		hasBuildTxId, err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		if err != nil {
+			log.Errorf("[UpdateTxInfoTable] error: %s", err)
+			close(self.txHandleTask.TransferQueue)
+			self.txHandleTask.WaitClose()
+			return
+		}
 	loop:
 		for _, trParam := range self.excel.BillList {
 			if trParam.Amount == "0" {
 				continue
 			}
-			if err := self.hasEnoughBalance(trParam.Amount, self.excel.TokenType); err != nil {
-				log.Errorf("[StartTransfer] hasEnoughBalance error: %s", err)
-				break loop
+			if !hasBuildTxId[trParam.Id] {
+				if err := self.hasEnoughBalance(trParam.Amount, self.excel.TokenType); err != nil {
+					log.Errorf("[StartTransfer] hasEnoughBalance error: %s", err)
+					break loop
+				}
 			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:
@@ -210,7 +218,7 @@ func (self *OntManager) StartTransfer() {
 				break loop
 			case <-self.stopChan:
 				log.Infof("[StartTransfer] StopChan, id: %d", trParam.Id)
-			    self.txHandleTask.StopTransferChan <- true
+				self.txHandleTask.StopTransferChan <- true
 				return
 			}
 		}

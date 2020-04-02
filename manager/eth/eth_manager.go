@@ -403,9 +403,11 @@ func (self *EthManager) Stop() {
 func (self *EthManager) StartTransfer() {
 	self.StartHandleTxTask()
 	go func() {
-		err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		hasBuildTx, err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
 		if err != nil {
 			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
+			close(self.txHandleTask.TransferQueue)
+			self.txHandleTask.WaitClose()
 			return
 		}
 	loop:
@@ -413,9 +415,11 @@ func (self *EthManager) StartTransfer() {
 			if trParam.Amount == "0" || trParam.Amount == "" {
 				continue
 			}
-			if err = self.hasEnoughBalance(trParam.Amount); err != nil {
-				log.Errorf("[StartTransfer]hasEnoughBalance error: %s, id: %d", err, trParam.Id)
-				break loop
+			if !hasBuildTx[trParam.Id] {
+				if err = self.hasEnoughBalance(trParam.Amount); err != nil {
+					log.Errorf("[StartTransfer]hasEnoughBalance error: %s, id: %d", err, trParam.Id)
+					break loop
+				}
 			}
 			select {
 			case self.txHandleTask.TransferQueue <- trParam:

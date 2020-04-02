@@ -171,13 +171,13 @@ func GetEventType(ctx *routing.Context) error {
 	if err != nil {
 		return writeResponse(ctx, QueryExcelParamByEventType)
 	}
-
 	events := make([]string, 0)
 	for _, eventName := range eventdirs {
 		e := ""
 		for _, tokenName := range config.SupportedTokenTypes {
 			if strings.HasPrefix(eventName, tokenName+"_") {
 				e = eventName[len(tokenName)+1:]
+
 				break
 			}
 		}

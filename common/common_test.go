@@ -32,3 +32,8 @@ func TestExcelParam_TrParamSort(t *testing.T) {
 	ep.TrParamSort()
 	fmt.Println(ep.BillList[0].Id)
 }
+
+func TestGetAllEventDirs(t *testing.T) {
+	aa,_ := GetAllEventDirs()
+	fmt.Println(aa)
+}

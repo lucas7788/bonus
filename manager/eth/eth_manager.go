@@ -526,6 +526,7 @@ func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amo
 	if err != nil {
 		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
 	}
+	gasLimit = gasLimit * 2
 	gasL := new(big.Int).SetUint64(gasLimit)
 	fee := new(big.Int).Mul(gasL, DEFAULT_GAS_PRICE)
 	log.Infof("fee:%s", utils.ToStringByPrecise(fee, config.ETH_DECIMALS))

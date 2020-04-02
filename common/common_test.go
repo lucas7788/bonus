@@ -34,6 +34,6 @@ func TestExcelParam_TrParamSort(t *testing.T) {
 }
 
 func TestGetAllEventDirs(t *testing.T) {
-	aa,_ := GetAllEventDirs()
+	aa, _ := GetAllEventDirs()
 	fmt.Println(aa)
 }

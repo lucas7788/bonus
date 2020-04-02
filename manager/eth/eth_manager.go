@@ -58,6 +58,7 @@ type EthManager struct {
 	Erc20Abi     abi.ABI
 	nonce        uint64
 	txHandleTask *transfer.TxHandleTask
+	stopChan     chan bool
 }
 
 func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*EthManager, error) {
@@ -112,6 +113,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		excel:        eatp,
 		netType:      netType,
 		db:           db,
+		stopChan:     make(chan bool),
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -394,7 +396,7 @@ func (self *EthManager) Stop() {
 	if self.txHandleTask == nil {
 		return
 	}
-	self.txHandleTask.StopChan <- true
+	self.stopChan <- true
 	self.txHandleTask.TransferStatus = common2.Stop
 }
 
@@ -421,9 +423,10 @@ func (self *EthManager) StartTransfer() {
 			case <-self.txHandleTask.CloseChan:
 				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
 				break loop
-			case <-self.txHandleTask.StopChan:
+			case <-self.stopChan:
 				log.Infof("[StartTransfer] stop, id: %d", trParam.Id)
-				break loop
+				self.txHandleTask.StopTransferChan <- true
+				return
 			}
 		}
 		close(self.txHandleTask.TransferQueue)

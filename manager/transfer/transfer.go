@@ -23,7 +23,8 @@ type TxHandleTask struct {
 	TransferStatus     common.TransferStatus
 	TokenType          string
 	db                 *bonus_db.BonusDB
-	StopChan           chan bool
+	StopTransferChan   chan bool
+	stopVerifyChan     chan bool
 }
 
 type VerifyParam struct {
@@ -37,14 +38,15 @@ func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *T
 	transferQueue := make(chan *common.TransferParam, txQueueSize)
 	verifyQueue := make(chan *VerifyParam, txQueueSize/2)
 	return &TxHandleTask{
-		TransferQueue:  transferQueue,
-		verifyTxQueue:  verifyQueue,
-		TransferStatus: common.Transfering,
-		CloseChan:      make(chan bool),
-		waitVerify:     make(chan bool),
-		StopChan:       make(chan bool),
-		TokenType:      tokenType,
-		db:             db,
+		TransferQueue:    transferQueue,
+		verifyTxQueue:    verifyQueue,
+		TransferStatus:   common.Transfering,
+		CloseChan:        make(chan bool),
+		waitVerify:       make(chan bool),
+		StopTransferChan: make(chan bool),
+		stopVerifyChan:   make(chan bool),
+		TokenType:        tokenType,
+		db:               db,
 	}
 }
 
@@ -96,6 +98,10 @@ func (self *TxHandleTask) exit() {
 func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
 	for {
 		select {
+		case <-self.StopTransferChan:
+			self.stopVerifyChan <- true
+			log.Info("[StartHandleTransferTask] exit transfer")
+			return
 		case param, ok := <-self.TransferQueue:
 			if !ok || param == nil {
 				self.exit()
@@ -223,6 +229,10 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 
 	for {
 		select {
+		case <-self.stopVerifyChan:
+			self.TransferStatus = common.Transfered
+			log.Info("[StartVerifyTxTask] exit verify")
+			return
 		case verifyParam, ok := <-self.verifyTxQueue:
 			if !ok || verifyParam.TxHash == "" {
 				self.TransferStatus = common.Transfered

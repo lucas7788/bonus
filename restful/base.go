@@ -48,7 +48,7 @@ var ErrMap = map[int64]string{
 	NotExistenceEvtType:         "NotExistenceEvtType",
 	SetGasPriceFailed:           "SetGasPriceFailed",
 	EventTypeNameError:          "EventTypeNameError",
-	ShouldBeTransfering:         "ShouldBeTransfering",
+	ShouldBeTransfering:         "only the status is transfering can be terminated",
 	StopError:                   "Stop",
 }
 

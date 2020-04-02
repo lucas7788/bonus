@@ -37,6 +37,7 @@ type OntManager struct {
 	contractAddress common.Address
 	decimals        int
 	txHandleTask    *transfer.TxHandleTask
+	stopChan chan bool
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*OntManager, error) {
@@ -97,6 +98,7 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 		db:      db,
 		account: acct,
 		ontSdk:  ontSdk,
+		stopChan:make(chan bool),
 	}
 
 	if mgr.excel.ContractAddress != "" {
@@ -206,9 +208,10 @@ func (self *OntManager) StartTransfer() {
 			case <-self.txHandleTask.CloseChan:
 				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
 				break loop
-			case <-self.txHandleTask.StopChan:
+			case <-self.stopChan:
 				log.Infof("[StartTransfer] StopChan, id: %d", trParam.Id)
-				break loop
+			    self.txHandleTask.StopTransferChan <- true
+				return
 			}
 		}
 		// FIXME: remove the close if tx-timeout not handled
@@ -224,7 +227,7 @@ func (self *OntManager) Stop() {
 	if self.txHandleTask == nil {
 		return
 	}
-	self.txHandleTask.StopChan <- true
+	self.stopChan <- true
 	self.txHandleTask.TransferStatus = common2.Stop
 }
 

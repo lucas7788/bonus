@@ -239,7 +239,7 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 		}
 		res[self.excel.TokenType] = utils.ToStringByPrecise(balance, erc20.Decimals)
 	}
-	ethBalance, err := self.ethClient.PendingBalanceAt(context.Background(), self.account.Address)
+	ethBalance, err := self.ethClient.BalanceAt(context.Background(), self.account.Address, nil)
 	if err != nil {
 		return nil, fmt.Errorf("[GetAdminBalance] Withdraw: cannot get eth pending balance, err: %s", err)
 	}

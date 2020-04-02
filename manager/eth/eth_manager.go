@@ -374,13 +374,13 @@ func (self *EthManager) hasEnoughBalance(amount string) error {
 		if !ok || erc20 == nil {
 			return fmt.Errorf("[StartTransfer]Withdraw: token %s not exist", self.excel.ContractAddress)
 		}
-		amt := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
+		amt := utils.ToIntByPrecise(amount, erc20.Decimals)
 		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, self.account.Address)
 		if err != nil {
 			return fmt.Errorf("[StartTransfer] Withdraw: cannot get self balance, token %s, err: %s", self.excel.ContractAddress, err)
 		}
-		baStr := utils.ToStringByPrecise(balance, erc20.Decimals)
 		if balance.Cmp(amt) < 0 {
+			baStr := utils.ToStringByPrecise(balance, erc20.Decimals)
 			return fmt.Errorf("[StartTransfer] not enough balance, balance: %s, amt: %s", baStr, amount)
 		}
 	}

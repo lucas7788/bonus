@@ -92,10 +92,12 @@ func GetAllEventDirs() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read basedir: %s", err)
 	}
+	//evtTime := make(map[string])
 	events := make([]string, 0)
 	for _, f := range files {
 		if f.IsDir() {
 			eventName := f.Name()
+			f.ModTime()
 			for _, tokenName := range config.SupportedTokenTypes {
 				if strings.HasPrefix(eventName, tokenName+"_") {
 					events = append(events, eventName)

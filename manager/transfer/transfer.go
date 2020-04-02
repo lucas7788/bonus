@@ -73,7 +73,7 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 			}
 			txInfos = append(txInfos, txInfo)
 		} else {
-			hasBuildTxId[tx.Id] = true
+			hasBuildTxId[trParam.Id] = true
 		}
 	}
 	if len(txInfos) > 0 {

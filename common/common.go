@@ -39,7 +39,7 @@ func CheckDir(path string) error {
 		return fmt.Errorf("mkdir failed: %s", err)
 	}
 
-	return CheckDir(fmt.Sprintf("%s%s",path, string(os.PathSeparator)))
+	return CheckDir(fmt.Sprintf("%s%s", path, string(os.PathSeparator)))
 }
 
 func (param *ExcelParam) TrParamSort() {

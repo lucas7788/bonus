@@ -35,7 +35,7 @@ func CreateManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB
 	default:
 		return nil, fmt.Errorf("[createManager] no support token, tokenType: %s", eatp.TokenType)
 	}
-	for _,tr := range eatp.BillList {
+	for _, tr := range eatp.BillList {
 		if !mgr.VerifyAddress(tr.Address) {
 			return nil, fmt.Errorf("address is wrong: %s", tr.Address)
 		}

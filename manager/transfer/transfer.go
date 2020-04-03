@@ -161,7 +161,7 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				txHash, txHex, err = mana.NewWithdrawTx(param.Address, param.Amount, "")
 				if err != nil && strings.Contains(err.Error(), config.InSufficientBalance) {
 					self.exit()
-					log.Errorf("Address: %s, amount:%s, error: %s", param.Address, param.Amount, config.InSufficientBalance)
+					log.Errorf("Address: %s, amount:%s, error: %s", param.Address, param.Amount, err)
 					return
 				}
 				if err != nil || txHash == "" || txHex == nil {

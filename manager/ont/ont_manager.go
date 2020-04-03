@@ -367,6 +367,15 @@ func (self *OntManager) NewBatchWithdrawTx(addrAndAmts [][]string) (string, []by
 }
 
 func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
+	//check fee
+	ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
+	if err != nil {
+		return fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
+	}
+	fee := utils.ToIntByPrecise("0.01", config.ONG_DECIMALS)
+	if ongBalance < fee.Uint64() {
+		return fmt.Errorf("[hasEnoughBalance] %s, adminbalance: %d, value: %d", config.InSufficientBalance, ongBalance, "0.01")
+	}
 	if tokenTy == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
 		adminbalance, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
@@ -415,6 +424,9 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	}
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
+		if err := self.hasEnoughBalance(amount,config.ONT);err != nil {
+			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		}
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
 		if err = self.hasEnoughBalance(amount, config.ONT); err != nil {
 			return "", nil, err
@@ -438,6 +450,9 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
+		if err := self.hasEnoughBalance(amount,config.ONG);err != nil {
+			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		}
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
 		if err = self.hasEnoughBalance(amount, config.ONG); err != nil {
 			return "", nil, err
@@ -461,6 +476,9 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
+		if err := self.hasEnoughBalance(amount,config.ONG);err != nil {
+			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		}
 		if self.contractAddress == common.ADDRESS_EMPTY {
 			return "", nil, fmt.Errorf("contractAddress is nil")
 		}

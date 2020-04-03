@@ -40,6 +40,7 @@ func UploadExcel(ctx *routing.Context) error {
 
 	if err := updateExcelParam(mgr, excelParam); err != SUCCESS {
 		log.Errorf("updateExcelParam error: %d", err)
+		common.ClearData(excelParam.NetType, excelParam.TokenType, excelParam.EventType)
 		return writeResponse(ctx, ResponsePack(err))
 	}
 

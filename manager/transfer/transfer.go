@@ -188,8 +188,9 @@ func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManage
 				if err != nil && retry < config.RetryLimit {
 					if err != nil {
 						log.Errorf("SendTx error :%s, retry:%d", err, retry)
-						if strings.Contains(err.Error(), "insufficient funds for gas * price + value") {
-							self.exit()
+						if strings.Contains(err.Error(), "insufficient funds for gas * price + value") ||
+							strings.Contains(err.Error(), "duplicated transaction detected") {
+							mana.Stop()
 							return
 						}
 					}

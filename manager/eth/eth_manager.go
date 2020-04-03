@@ -650,7 +650,7 @@ func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 			if retry >= retryLimit {
 				return false, err
 			}
-			log.Errorf("[VerifyTx] TransactionByHash error: %s, txHash: %s", err, txHash)
+			log.Errorf("[VerifyTx] error: %s, txHash: %s, retry: %d", err, txHash, retry)
 			retry++
 			time.Sleep(time.Second * config.EthSleepTime)
 			continue

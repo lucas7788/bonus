@@ -29,6 +29,18 @@ func CheckPath(path string) error {
 
 	return nil
 }
+func CheckDir(path string) error {
+	if PathExists(path) {
+		return nil
+	}
+
+	dirPath := filepath.Dir(path)
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		return fmt.Errorf("mkdir failed: %s", err)
+	}
+
+	return CheckDir(fmt.Sprintf("%s%s",path, string(os.PathSeparator)))
+}
 
 func (param *ExcelParam) TrParamSort() {
 	sort.Slice(param.BillList, func(i, j int) bool {

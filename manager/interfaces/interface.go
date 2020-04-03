@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"github.com/ontio/bonus/common"
+	"github.com/ontio/bonus/bonus_db"
 )
 
 type WithdrawManager interface {
@@ -28,4 +29,5 @@ type WithdrawManager interface {
 	QueryTxInfo(start, end int, txResult common.TxResult) ([]*common.TransactionInfo, int, error)
 	SetGasPrice(gasPrice uint64) error
 	GetGasPrice() uint64
+	SetDB(db *bonus_db.BonusDB)
 }

@@ -12,36 +12,35 @@ import (
 )
 
 func CreateManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
-	if db == nil {
-		var err error
-		db, err = bonus_db.NewBonusDB(eatp.TokenType, eatp.EventType, netType)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if eatp.TokenType == config.OEP4 || eatp.TokenType == config.ERC20 {
 		if eatp.ContractAddress == "" {
 			return nil, fmt.Errorf("ContractAddress is nil")
 		}
 	}
+	var mgr interfaces.WithdrawManager
+	var err error
 	switch eatp.TokenType {
 	case config.ONG, config.OEP4, config.ONT:
 		// init ont mgr in working-path
-		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType, db)
+		mgr, err = ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
-		return ontManager, nil
 	case config.ERC20, config.ETH:
 		// init eth mgr in working-path
-		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType, db)
+		mgr, err = eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
-		return ethManager, nil
 	default:
 		return nil, fmt.Errorf("[createManager] no support token, tokenType: %s", eatp.TokenType)
 	}
+	for _,tr := range eatp.BillList {
+		if !mgr.VerifyAddress(tr.Address) {
+			return nil, fmt.Errorf("address is wrong: %s", tr.Address)
+		}
+	}
+	return mgr, nil
 }
 
 func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawManager, error) {
@@ -56,10 +55,11 @@ func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawMa
 		if err != nil {
 			return nil, fmt.Errorf("failed to load ont mgr: %s", err)
 		}
-		ontManager, err := ont.NewOntManager(cfg, eatp, netType, db)
+		ontManager, err := ont.NewOntManager(cfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
+		ontManager.SetDB(db)
 		return ontManager, nil
 	case config.ERC20, config.ETH:
 		// init eth mgr in working-path
@@ -67,10 +67,11 @@ func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawMa
 		if err != nil {
 			return nil, fmt.Errorf("failed to load eth mgr: %s", err)
 		}
-		ethManager, err := eth.NewEthManager(cfg, eatp, netType, db)
+		ethManager, err := eth.NewEthManager(cfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
+		ethManager.SetDB(db)
 		return ethManager, nil
 	}
 	return nil, fmt.Errorf("[createManager] no support token, tokenType: %s, eventType: %s", tokenType, eventType)

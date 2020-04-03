@@ -37,3 +37,10 @@ func TestGetAllEventDirs(t *testing.T) {
 	aa, _ := GetAllEventDirs()
 	fmt.Println(aa)
 }
+
+func TestCheckDir(t *testing.T) {
+	err := CheckDir("./aa/bb")
+	if err != nil {
+		fmt.Println(err)
+	}
+}

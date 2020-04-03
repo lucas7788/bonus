@@ -61,7 +61,7 @@ type EthManager struct {
 	stopChan     chan bool
 }
 
-func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*EthManager, error) {
+func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
 	var rpcAddr string
 	if netType == config.MainNet {
 		rpcAddr = cfg.RpcAddrMainNet
@@ -83,7 +83,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		return nil, err
 	}
 	walletDir := common2.GetEventDir(eatp.TokenType, eatp.EventType)
-	err = common2.CheckPath(walletDir)
+	err = common2.CheckDir(walletDir)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,6 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		txTimeClient: c,
 		excel:        eatp,
 		netType:      netType,
-		db:           db,
 		stopChan:     make(chan bool),
 	}
 
@@ -134,6 +133,9 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string, db
 		}
 	}
 	return mgr, nil
+}
+func (this *EthManager) SetDB(db *bonus_db.BonusDB) {
+	this.db = db
 }
 
 func parseGasPriceToGwei(gasPrice *big.Int) int {

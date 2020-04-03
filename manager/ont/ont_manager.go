@@ -40,7 +40,7 @@ type OntManager struct {
 	stopChan        chan bool
 }
 
-func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db *bonus_db.BonusDB) (*OntManager, error) {
+func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
 	var rpcAddr string
 	if netType == config.MainNet {
 		rpcAddr = cfg.OntJsonRpcAddressMainNet
@@ -52,11 +52,10 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 	ontSdk := sdk.NewOntologySdk()
 	ontSdk.NewRpcClient().SetAddress(rpcAddr)
 	walletPath := common2.GetEventDir(eatp.TokenType, eatp.EventType)
-	err := common2.CheckPath(walletPath)
+	err := common2.CheckDir(walletPath)
 	if err != nil {
 		return nil, err
 	}
-
 	walletName := fmt.Sprintf("%s%s.dat", "ont_", eatp.EventType)
 	walletFile := filepath.Join(walletPath, walletName)
 	var wallet *sdk.Wallet
@@ -95,7 +94,6 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 		cfg:      cfg,
 		excel:    eatp,
 		netType:  netType,
-		db:       db,
 		account:  acct,
 		ontSdk:   ontSdk,
 		stopChan: make(chan bool),
@@ -106,8 +104,11 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string, db
 			return nil, fmt.Errorf("update contract info: %s", err)
 		}
 	}
-
 	return mgr, nil
+}
+
+func (this *OntManager) SetDB(db *bonus_db.BonusDB) {
+	this.db = db
 }
 
 type OntPersistHelper struct {
@@ -116,6 +117,13 @@ type OntPersistHelper struct {
 }
 
 func (this *OntManager) Store() error {
+	if this.db == nil {
+		db, err := bonus_db.NewBonusDB(this.excel.TokenType, this.excel.EventType, this.netType)
+		if err != nil {
+			return err
+		}
+		this.db = db
+	}
 	for _, item := range this.excel.BillList {
 		if !this.VerifyAddress(item.Address) {
 			return fmt.Errorf("invalid address: %s", item.Address)
@@ -374,7 +382,7 @@ func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
 	}
 	fee := utils.ToIntByPrecise("0.01", config.ONG_DECIMALS)
 	if ongBalance < fee.Uint64() {
-		return fmt.Errorf("[hasEnoughBalance] %s, adminbalance: %d, value: %d", config.InSufficientBalance, ongBalance, "0.01")
+		return fmt.Errorf("[hasEnoughBalance] %s, adminbalance: %d, value: %f", config.InSufficientBalance, ongBalance, 0.01)
 	}
 	if tokenTy == config.ONT {
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
@@ -424,8 +432,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 	}
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
-		if err := self.hasEnoughBalance(amount,config.ONT);err != nil {
-			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		if err := self.hasEnoughBalance(amount, config.ONT); err != nil {
+			return "", nil, fmt.Errorf("%s, error: %s", config.InSufficientBalance, err)
 		}
 		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
 		if err = self.hasEnoughBalance(amount, config.ONT); err != nil {
@@ -450,8 +458,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
-		if err := self.hasEnoughBalance(amount,config.ONG);err != nil {
-			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		if err := self.hasEnoughBalance(amount, config.ONG); err != nil {
+			return "", nil, fmt.Errorf("%s, error: %s", config.InSufficientBalance, err)
 		}
 		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
 		if err = self.hasEnoughBalance(amount, config.ONG); err != nil {
@@ -476,8 +484,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
-		if err := self.hasEnoughBalance(amount,config.ONG);err != nil {
-			return "",nil,fmt.Errorf("%s", config.InSufficientBalance)
+		if err := self.hasEnoughBalance(amount, config.ONG); err != nil {
+			return "", nil, fmt.Errorf("%s, error: %s", config.InSufficientBalance, err)
 		}
 		if self.contractAddress == common.ADDRESS_EMPTY {
 			return "", nil, fmt.Errorf("contractAddress is nil")

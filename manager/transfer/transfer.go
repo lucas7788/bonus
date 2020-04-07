@@ -55,6 +55,10 @@ func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eat
 	hasBuildTxId := make(map[int]bool)
 	//update tx info table
 	for _, trParam := range eatp.BillList {
+		if trParam == nil {
+			log.Errorf("trparam is nil")
+			continue
+		}
 		tx, err := this.db.QueryTxHexByExcelAndAddr(eatp.EventType, trParam.Address, trParam.Id)
 		if err != nil {
 			log.Errorf("QueryTxHexByExcelAndAddr error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)

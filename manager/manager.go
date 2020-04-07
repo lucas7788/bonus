@@ -11,7 +11,7 @@ import (
 	"github.com/ontio/bonus/manager/ont"
 )
 
-func CreateManager(eatp *common.ExcelParam, netType string, db *bonus_db.BonusDB) (interfaces.WithdrawManager, error) {
+func CreateManager(eatp *common.ExcelParam, netType string) (interfaces.WithdrawManager, error) {
 	if eatp.TokenType == config.OEP4 || eatp.TokenType == config.ERC20 {
 		if eatp.ContractAddress == "" {
 			return nil, fmt.Errorf("ContractAddress is nil")

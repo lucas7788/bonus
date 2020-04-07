@@ -12,6 +12,7 @@ import (
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
+	"github.com/ontio/bonus/bonus_db"
 )
 
 var DefBonusMap = new(sync.Map) // evttype + nettype -> withdraw-mgr
@@ -22,7 +23,9 @@ func UploadExcel(ctx *routing.Context) error {
 	if errCode != SUCCESS {
 		return writeResponse(ctx, ResponsePack(errCode))
 	}
-	if strings.Contains(excelParam.EventType, "_") {
+	if strings.Contains(excelParam.EventType, "_") ||
+		strings.Contains(excelParam.EventType, "/") ||
+		strings.Contains(excelParam.EventType, "\\") {
 		return writeResponse(ctx, ResponsePack(EventTypeNameError))
 	}
 	if _, exist := DefBonusMap.Load(excelParam.EventType); exist {
@@ -31,7 +34,7 @@ func UploadExcel(ctx *routing.Context) error {
 
 	excelParam.ResetTransferListID()
 
-	mgr, err := manager.CreateManager(excelParam, excelParam.NetType, nil)
+	mgr, err := manager.CreateManager(excelParam, excelParam.NetType)
 	if err != nil {
 		common.ClearData(excelParam.NetType, excelParam.TokenType, excelParam.EventType)
 		log.Errorf("CreateManager error: %s", err)
@@ -51,6 +54,11 @@ func UploadExcel(ctx *routing.Context) error {
 		log.Errorf("Store error: %s", err)
 		return writeResponse(ctx, ResponsePack(InsertSqlError))
 	}
+	db, err := bonus_db.NewBonusDB(excelParam.TokenType, excelParam.EventType, excelParam.NetType)
+	if err != nil {
+		return writeResponse(ctx, ResponseSuccess(NewDBError))
+	}
+	mgr.SetDB(db)
 	DefBonusMap.Store(excelParam.EventType, excelParam.TokenType)
 	DefBonusMap.Store(excelParam.EventType+excelParam.NetType, mgr)
 	return writeResponse(ctx, ResponseSuccess(excelParam))

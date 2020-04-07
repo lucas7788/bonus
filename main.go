@@ -108,10 +108,10 @@ func waitToExit() {
 
 func startHtml() {
 	r := gin.Default()
-
 	// work version
 	r.Static("/", "web")
 	r.NoRoute(func(c *gin.Context) {
+		log.Info("************")
 		c.Redirect(301, "/")
 	})
 	go func() {

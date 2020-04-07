@@ -398,8 +398,8 @@ func (self *EthManager) Stop() {
 	if self.txHandleTask == nil {
 		return
 	}
-	self.stopChan <- true
 	self.txHandleTask.TransferStatus = common2.Stop
+	self.stopChan <- true
 }
 
 func (self *EthManager) StartTransfer() {
@@ -431,6 +431,7 @@ func (self *EthManager) StartTransfer() {
 				break loop
 			case <-self.stopChan:
 				log.Infof("[StartTransfer] stop, id: %d", trParam.Id)
+				self.txHandleTask.TransferStatus = common2.Transfered
 				self.txHandleTask.StopTransferChan <- true
 				return
 			}

@@ -1,21 +1,18 @@
 package transfer
 
 import (
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager/interfaces"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
+	"math/big"
+	"sync"
 )
 
 type TxHandleTask struct {
-	TransferQueue      chan *common.TransferParam
-	verifyTxQueue      chan *VerifyParam
+	verifyTxQueue      chan string
 	hasTransferedOntid map[string]bool
 	CloseChan          chan bool
 	waitVerify         chan bool
@@ -23,7 +20,7 @@ type TxHandleTask struct {
 	TransferStatus     common.TransferStatus
 	TokenType          string
 	db                 *bonus_db.BonusDB
-	StopTransferChan   chan bool
+	stopChan           chan bool
 	stopVerifyChan     chan bool
 }
 
@@ -34,20 +31,130 @@ type VerifyParam struct {
 	Address   string
 }
 
-func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int) *TxHandleTask {
-	transferQueue := make(chan *common.TransferParam, txQueueSize)
-	verifyQueue := make(chan *VerifyParam, txQueueSize/2)
+func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int, stopChan chan bool) *TxHandleTask {
+	verifyQueue := make(chan string, txQueueSize/2)
 	return &TxHandleTask{
-		TransferQueue:    transferQueue,
-		verifyTxQueue:    verifyQueue,
-		TransferStatus:   common.Transfering,
-		CloseChan:        make(chan bool),
-		waitVerify:       make(chan bool),
-		StopTransferChan: make(chan bool),
-		stopVerifyChan:   make(chan bool),
-		TokenType:        tokenType,
-		db:               db,
+		verifyTxQueue:  verifyQueue,
+		TransferStatus: common.Transfering,
+		CloseChan:      make(chan bool),
+		waitVerify:     make(chan bool),
+		stopVerifyChan: make(chan bool),
+		TokenType:      tokenType,
+		db:             db,
+		stopChan:       stopChan,
 	}
+}
+
+func (self *TxHandleTask) updateTxCache(total int, txCaches map[string]*common.TxCache) (map[string]*common.TxCache, error) {
+	for addr, val := range txCaches {
+		if val.TxStatus != common.TxSuccess {
+			txResult, err := self.db.QueryTxResult(val.Addr)
+			if err != nil {
+				return nil, err
+			}
+			txCaches[addr].TxStatus = txResult
+		}
+	}
+	return txCaches, nil
+}
+
+func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, txCaches map[string]*common.TxCache, excel *common.ExcelParam, collectData map[string]*big.Int) (map[string]*common.TxCache, error) {
+	defer close(self.verifyTxQueue)
+	collectDataLen := len(collectData)
+	if txCaches == nil {
+		txCache := make(map[string]*common.TxCache, collectDataLen)
+		txCache, err := self.db.QueryTxInfo(txCache)
+		if err != nil {
+			log.Errorf("[StartTransfer] QueryTxInfo failed: %s", err)
+			return nil, err
+		}
+		txCaches = txCache
+	} else {
+		total, err := self.db.QueryTxInfoNum()
+		if err != nil {
+			log.Errorf("[StartTransfer] QueryTxInfoNum failed: %s", err)
+			return nil, err
+		}
+		txCaches, err = self.updateTxCache(total, txCaches)
+		if err != nil {
+			return nil, err
+		}
+	}
+	txInfoArr := make([]*common.TransactionInfo, 30)
+	txInfoArrIndex := 0
+	var txHash string
+	var txHex []byte
+	index := 0
+	for addr, amt := range collectData {
+		if txCaches[addr] != nil && txCaches[addr].TxStatus == common.TxSuccess {
+			continue
+		}
+		var err error
+		if txCaches[addr] != nil && txCaches[addr].TxStatus != common.TxSuccess {
+			txHash, err = mana.SendTx(txCaches[addr].TxHex)
+			if err != nil {
+				log.Errorf("[StartTransfer] SendTx error: %s", err)
+				return nil, err
+			}
+		} else if txCaches[addr] == nil {
+			txHash, txHex, err = mana.NewWithdrawTx(addr, amt, excel.TokenType)
+			if err != nil {
+				log.Errorf("[StartTransfer] NewWithdrawTx failed: %s", err)
+				return nil, err
+			}
+			txCaches[addr] = &common.TxCache{
+				Addr:     addr,
+				TxHash:   txHash,
+				TxHex:    txHex,
+				TxStatus: common.OneTransfering,
+			}
+			txInfoArr[txInfoArrIndex] = &common.TransactionInfo{
+				Id:              index,
+				NetType:         excel.NetType,
+				EventType:       excel.EventType,
+				TokenType:       excel.TokenType,
+				ContractAddress: excel.ContractAddress,
+				Address:         addr,
+				Amount:          addr,
+				TxHash:          txHash,
+				TxTime:          0,
+				TxHex:           common2.ToHexString(txHex),
+				TxResult:        common.OneTransfering,
+				ErrorDetail:     "",
+			}
+			txInfoArrIndex += 1
+			if txInfoArrIndex == 29 || index == collectDataLen-1 {
+				err := self.db.InsertTxInfoSql(txInfoArr)
+				if err != nil {
+					log.Errorf("[StartTransfer] InsertTxInfoSql failed: %s", err)
+					return nil, err
+				}
+				for j := 0; j < len(txInfoArr); j++ {
+					if txInfoArr[j] == nil {
+						continue
+					}
+					txHash, err := mana.SendTx(txCaches[txInfoArr[j].Address].TxHex)
+					if err != nil {
+						log.Errorf("[StartTransfer] SendTx error: %s", err)
+						return nil, err
+					}
+					log.Infof("tx send success, txhash:%s", txHash)
+					self.verifyTxQueue <- txHash
+					txInfoArr[j] = nil
+				}
+				txInfoArrIndex = 0
+			}
+		}
+		index += 1
+		select {
+		case <-self.stopChan:
+			log.Infof("[StartTransfer] stopChan, address: %d", addr)
+			return txCaches, nil
+		default:
+			continue
+		}
+	}
+	return txCaches, nil
 }
 
 func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eatp *common.ExcelParam) (map[int]bool, error) {
@@ -102,136 +209,6 @@ func (self *TxHandleTask) exit() {
 	log.Info("exit StartHandleTransferTask gorountine")
 }
 
-func (self *TxHandleTask) StartHandleTransferTask(mana interfaces.WithdrawManager, eventType string) {
-	for {
-		select {
-		case <-self.StopTransferChan:
-			self.stopVerifyChan <- true
-			log.Info("[StartHandleTransferTask] exit transfer")
-			return
-		case param, ok := <-self.TransferQueue:
-			if !ok || param == nil {
-				self.exit()
-				return
-			}
-			var txHex []byte
-			var err error
-			txInfo, err := self.db.QueryTxHexByExcelAndAddr(eventType, param.Address, param.Id)
-			if err != nil {
-				log.Errorf("QueryTxHexByOntid failed,address: %s, error: %s", param.Address, err)
-				continue
-			}
-
-			if txInfo != nil && txInfo.TxResult == common.TxSuccess {
-				continue
-			}
-			//if tx verify failed, here should be verify again
-			if (txInfo != nil && txInfo.TxResult == common.TxFailed && txInfo.TxHash != "") ||
-				(txInfo != nil && txInfo.TxResult == common.OneTransfering && txInfo.TxHash != "") ||
-				(txInfo != nil && txInfo.TxResult == common.SendFailed && txInfo.TxHash != "") {
-
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.OneTransfering, 0, "")
-				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
-						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
-				}
-
-				boo, err := mana.VerifyTx(txInfo.TxHash, 1)
-				if boo {
-					log.Infof("Failed transactions revalidate success, txhash: %s", txInfo.TxHash)
-					ti, err := mana.GetTxTime(txInfo.TxHash)
-					if err != nil {
-						log.Errorf("GetTxTime error: %s", err)
-						continue
-					}
-					err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.TxSuccess, ti, "")
-					if err != nil {
-						log.Errorf("UpdateTxResult failed, txhash: %s, error: %s", txInfo.TxHash, err)
-					}
-					continue
-				}
-				log.Infof("Failed transactions revalidate failed, txhash: %s, error: %s", txInfo.TxHash, err)
-			}
-			if txInfo != nil && txInfo.TxHex != "" {
-				txHex, err = common2.HexToBytes(txInfo.TxHex)
-				if err != nil {
-					log.Errorf("QueryTxHexByOntid HexToBytes failed, error: %s", err)
-					continue
-				}
-			}
-			//build tx
-			if txHex == nil {
-				var txHash string
-				txHash, txHex, err = mana.NewWithdrawTx(param.Address, param.Amount, "")
-				if err != nil && strings.Contains(err.Error(), config.InSufficientBalance) {
-					self.exit()
-					log.Errorf("Address: %s, amount:%s, error: %s", param.Address, param.Amount, err)
-					return
-				}
-				if err != nil || txHash == "" || txHex == nil {
-					log.Errorf("Build Transfer Tx failed,address: %s,txHash: %s, err: %s", param.Address, txHash, err)
-					err := self.db.UpdateTxResult(eventType, param.Address, param.Id, common.BuildTxFailed, 0, err.Error())
-					if err != nil {
-						log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s", err, eventType, param.Address)
-					}
-					continue
-				}
-				log.Debugf("tx build success, txhash: %s", txHash)
-				err := self.db.UpdateTxInfo(txHash, common2.ToHexString(txHex), common.OneTransfering, eventType, param.Address, param.Id)
-				if err != nil {
-					log.Errorf("UpdateTxInfo error: %s, event type:%s, address: %s", err, eventType, param.Address)
-					continue
-				}
-				log.Infof("txHash:%s, txHex:%s, address:%s, amount:%s", txHash, common2.ToHexString(txHex), param.Address, param.Amount)
-			}
-			//send tx
-			retry := 0
-			var hash string
-			for {
-				hash, err = mana.SendTx(txHex)
-				if err != nil && retry < config.RetryLimit {
-					if err != nil {
-						log.Errorf("SendTx error :%s, retry:%d", err, retry)
-						if strings.Contains(err.Error(), "insufficient funds for gas * price + value") {
-							mana.Stop()
-							return
-						}
-					}
-					retry += 1
-					time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
-					continue
-				} else {
-					break
-				}
-			}
-			if err != nil || hash == "" {
-				log.Errorf("SendTx error: %s, txhash: %s", err, hash)
-				//save txHex
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.SendFailed, 00, err.Error())
-				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, txHash: %s, txresult: %d",
-						err, eventType, param.Address, txInfo.TxHash, byte(common.SendFailed))
-				}
-				continue
-			} else {
-				//save txHex
-				err = self.db.UpdateTxResult(eventType, param.Address, param.Id, common.OneTransfering, 0, "")
-				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, eventType: %s, address: %s, projectId: %d, txHash: %s, txresult: %d",
-						err, eventType, param.Address, txInfo.TxHash, byte(common.OneTransfering))
-				}
-			}
-			log.Infof("tx send success, txhash: %s, time: %d", hash, time.Now().Unix())
-			self.verifyTxQueue <- &VerifyParam{
-				Id:        param.Id,
-				TxHash:    hash,
-				Address:   param.Address,
-				EventType: eventType,
-			}
-		}
-	}
-}
-
 func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 
 	for {
@@ -240,34 +217,35 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 			self.TransferStatus = common.Transfered
 			log.Info("[StartVerifyTxTask] exit verify")
 			return
-		case verifyParam, ok := <-self.verifyTxQueue:
-			if !ok || verifyParam.TxHash == "" {
+		case txHash, ok := <-self.verifyTxQueue:
+			if !ok || txHash == "" {
 				self.TransferStatus = common.Transfered
 				self.waitVerify <- true
 				log.Info("exit StartVerifyTxTask gorountine")
 				return
 			}
-			boo, err := mana.VerifyTx(verifyParam.TxHash, config.RetryLimit)
+			boo, err := mana.VerifyTx(txHash, config.RetryLimit)
 			if !boo {
 				//save failed tx to bonus_db
-				err := self.db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxFailed, 0, err.Error())
+				err := self.db.UpdateTxResultByTxHash(txHash, common.TxFailed, 0, err.Error())
 				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
+					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, txHash)
 				}
-				log.Errorf("VerifyTx failed, txhash: %s, error: %s", verifyParam.TxHash, err)
+				log.Errorf("VerifyTx failed, txhash: %s, error: %s", txHash, err)
 				continue
 			}
-			ti, err := mana.GetTxTime(verifyParam.TxHash)
+			ti, err := mana.GetTxTime(txHash)
 			if err != nil {
 				log.Errorf("GetTxTime error: %s", err)
 				continue
 			}
 			//update bonus_db
-			err = self.db.UpdateTxResult(verifyParam.EventType, verifyParam.Address, verifyParam.Id, common.TxSuccess, ti, "success")
+			err = self.db.UpdateTxResultByTxHash(txHash, common.TxSuccess, ti, "success")
 			if err != nil {
-				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyParam.TxHash)
+				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, txHash)
+				continue
 			}
-			log.Debugf("verify tx success, txhash: %s", verifyParam.TxHash)
+			log.Debugf("verify tx success, txhash: %s", txHash)
 		}
 	}
 }

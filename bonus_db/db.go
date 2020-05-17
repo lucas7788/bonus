@@ -61,6 +61,9 @@ func (this *BonusDB) Close() {
 func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
 	sqlStrArr := make([]string, 0)
 	for _, txInfo := range args {
+		if txInfo == nil {
+			continue
+		}
 		oneData := fmt.Sprintf("('%d','%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.Id, txInfo.NetType, txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex, txInfo.TxResult, txInfo.ErrorDetail)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
@@ -86,6 +89,19 @@ func (this *BonusDB) UpdateTxInfo(txHash, TxHex string, txResult common.TxResult
 		return err
 	}
 	_, err = stmt.Exec(txHash, TxHex, txResult, eventType, address, id)
+	return err
+}
+
+func (this *BonusDB) UpdateTxResultByTxHash(txHash string, txResult common.TxResult, txTime uint32, errDetail string) error {
+	strSql := "update bonus_transaction_info set TxResult=?, TxTime=?, ErrorDetail= ? where TxHash=?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(txResult, txTime, errDetail, txHash)
 	return err
 }
 
@@ -204,6 +220,94 @@ func (this *BonusDB) QueryTxHexByTxHash(txHash string) (*common.TransactionInfo,
 		}, nil
 	}
 	return nil, nil
+}
+
+func (this *BonusDB) QueryTxInfo(txCaches map[string]*common.TxCache) (map[string]*common.TxCache, error) {
+	strSql := "select Id,Address,TxHash,TxHex,TxResult from bonus_transaction_info"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query()
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var txHash, txHex, addr string
+		var txResult common.TxResult
+		if err = rows.Scan(&addr, &txHash, &txHex, &txResult); err != nil {
+			return nil, err
+		}
+		txHexBytes, err := common2.HexToBytes(txHex)
+		if err != nil {
+			panic(err)
+		}
+		txCaches[addr] = &common.TxCache{
+			Addr:     addr,
+			TxHash:   txHash,
+			TxHex:    txHexBytes,
+			TxStatus: txResult,
+		}
+	}
+	return txCaches, nil
+}
+
+func (this *BonusDB) QueryTxResult(addr string) (common.TxResult, error) {
+	strSql := "select TxResult from bonus_transaction_info where Address=?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return common.NotBuild, err
+	}
+	rows, err := stmt.Query(addr)
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return common.NotBuild, err
+	}
+	for rows.Next() {
+		var txResult common.TxResult
+		if err = rows.Scan(&txResult); err != nil {
+			return common.NotBuild, err
+		}
+		return txResult, nil
+	}
+	return common.NotBuild, nil
+}
+
+func (this *BonusDB) QueryTxInfoNum() (int, error) {
+	strSql := "select count(*) from bonus_transaction_info"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	rows, err := stmt.Query()
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var txInfoNum int
+		if err = rows.Scan(&txInfoNum); err != nil {
+			return 0, err
+		}
+		return txInfoNum, nil
+	}
+	return 0, nil
 }
 
 func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {

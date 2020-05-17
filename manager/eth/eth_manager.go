@@ -59,6 +59,9 @@ type EthManager struct {
 	nonce        uint64
 	txHandleTask *transfer.TxHandleTask
 	stopChan     chan bool
+	txCache      map[string]*common2.TxCache
+	collectData  map[string]*big.Int
+	decimals     uint64
 }
 
 func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
@@ -103,7 +106,10 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		account = accs[0]
 	}
 	log.Infof("eth admin address: %s", account.Address.Hex())
-
+	decimal := 0
+	if eatp.TokenType == config.ETH {
+		decimal = config.ETH_DECIMALS
+	}
 	mgr := &EthManager{
 		tokens:       make(map[string]*Token),
 		account:      account,
@@ -113,6 +119,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 		excel:        eatp,
 		netType:      netType,
 		stopChan:     make(chan bool),
+		decimals:     uint64(decimal),
 	}
 
 	nonce, err := ethClient.PendingNonceAt(context.Background(), account.Address)
@@ -132,8 +139,25 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 			return nil, fmt.Errorf("update contract info: %s", err)
 		}
 	}
+	mgr.initCollectData()
 	return mgr, nil
 }
+
+func (this *EthManager) initCollectData() {
+	collectData := make(map[string]*big.Int)
+	var trAmt *big.Int
+	for _, trParam := range this.excel.BillList {
+		trAmt = utils.ToIntByPrecise(trParam.Amount, uint64(this.decimals))
+		amt, ok := collectData[trParam.Address]
+		if !ok {
+			collectData[trParam.Address] = trAmt
+		} else {
+			collectData[trParam.Address] = new(big.Int).Add(amt, trAmt)
+		}
+	}
+	this.collectData = collectData
+}
+
 func (this *EthManager) SetDB(db *bonus_db.BonusDB) {
 	this.db = db
 }
@@ -271,7 +295,7 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 }
 
 func (this *EthManager) GetTotal() int {
-	return len(this.excel.BillList)
+	return len(this.collectData)
 }
 
 func (self *EthManager) ComputeSum() (string, error) {
@@ -332,7 +356,8 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		return fmt.Errorf("[WithdrawToken] fetch nonce failed, %s", err)
 	}
 	self.nonce = nonce
-	hash, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
+	amount := utils.ToIntByPrecise(amt, self.decimals)
+	hash, txHex, err := self.NewWithdrawTx(address, amount, tokenType)
 	if hash == "" || txHex == nil || err != nil {
 		return fmt.Errorf("[WithdrawToken] NewWithdrawTx failed, error: %s", err)
 	}
@@ -358,6 +383,7 @@ func (this *EthManager) updateContractInfo(address string) error {
 		return fmt.Errorf("NewEthManager: cannot get %s decimals, err: %s", this.excel.ContractAddress, err)
 	}
 	this.tokens[this.excel.ContractAddress] = &Token{ContractAddr: contractAddr, Decimals: decimals.Uint64(), Contract: erc20}
+	this.decimals = decimals.Uint64()
 	return nil
 }
 
@@ -403,41 +429,15 @@ func (self *EthManager) Stop() {
 }
 
 func (self *EthManager) StartTransfer() {
-	self.StartHandleTxTask()
+	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE, self.stopChan)
+	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
-		hasBuildTx, err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		txCaches, err := self.txHandleTask.StartTxTask(self, self.txCache, self.excel, self.collectData)
 		if err != nil {
-			log.Errorf("[StartTransfer] UpdateTxInfoTable error: %s", err)
-			close(self.txHandleTask.TransferQueue)
-			self.txHandleTask.WaitClose()
+			log.Errorf("[StartTransfer] error: %s", err)
 			return
 		}
-	loop:
-		for _, trParam := range self.excel.BillList {
-			if trParam.Amount == "0" || trParam.Amount == "" {
-				continue
-			}
-			if !hasBuildTx[trParam.Id] {
-				if err = self.hasEnoughBalance(trParam.Amount); err != nil {
-					log.Errorf("[StartTransfer]hasEnoughBalance error: %s, id: %d", err, trParam.Id)
-					break loop
-				}
-			}
-			select {
-			case self.txHandleTask.TransferQueue <- trParam:
-				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
-			case <-self.txHandleTask.CloseChan:
-				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
-				break loop
-			case <-self.stopChan:
-				log.Infof("[StartTransfer] stop, id: %d", trParam.Id)
-				self.txHandleTask.TransferStatus = common2.Transfered
-				self.txHandleTask.StopTransferChan <- true
-				return
-			}
-		}
-		close(self.txHandleTask.TransferQueue)
-		self.txHandleTask.WaitClose()
+		self.txCache = txCaches
 	}()
 }
 
@@ -448,51 +448,42 @@ func (self *EthManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
-func (self *EthManager) StartHandleTxTask() {
-	//start transfer task and verify task
-	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE)
-	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
-	go self.txHandleTask.StartVerifyTxTask(self)
-}
-
-func (this *EthManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {
+func (this *EthManager) NewWithdrawTx(destAddr string, amount *big.Int, tokenType string) (string, []byte, error) {
 	to := ethComm.Address{}
 	if ethComm.IsHexAddress(destAddr) {
 		to = ethComm.HexToAddress(destAddr)
 	} else {
 		return "", nil, fmt.Errorf("Withdraw: dest addr is invaild")
 	}
-	ethBalance, err := this.ethClient.PendingBalanceAt(context.Background(), this.account.Address)
-	if err != nil {
-		return "", nil, fmt.Errorf("Withdraw: cannot get eth pending balance, err: %s", err)
-	}
-	if ethBalance.Cmp(MIN_ETH_BANALNCE) < 0 {
-		return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
-			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
-	}
+	//ethBalance, err := this.ethClient.PendingBalanceAt(context.Background(), this.account.Address)
+	//if err != nil {
+	//	return "", nil, fmt.Errorf("Withdraw: cannot get eth pending balance, err: %s", err)
+	//}
+	//if ethBalance.Cmp(MIN_ETH_BANALNCE) < 0 {
+	//	return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
+	//		utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
+	//}
 	if (this.excel.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
-		withdrawAmount := utils.ToIntByPrecise(amount, config.ETH_DECIMALS)
-		if ethBalance.Cmp(withdrawAmount) < 0 {
-			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
-		}
-		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.TokenType,
-			utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
-		return this.newWithdrawEthTx(to, withdrawAmount, DEFAULT_GAS_PRICE)
+		//if ethBalance.Cmp(amount) < 0 {
+		//	return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
+		//}
+		//log.Debugf("Withdraw: %s, pending balance is %s", this.excel.TokenType,
+		//	utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
+		return this.newWithdrawEthTx(to, amount, DEFAULT_GAS_PRICE)
 	} else {
 		erc20, ok := this.tokens[this.excel.ContractAddress]
 		if !ok {
 			return "", nil, fmt.Errorf("Withdraw: token %s not exist", this.excel.ContractAddress)
 		}
-		withdrawAmount := utils.ToIntByPrecise(amount, erc20.Decimals)
-		balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, this.account.Address)
-		if err != nil {
-			return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.excel.ContractAddress, err)
-		}
-		if balance.Cmp(withdrawAmount) < 0 {
-			return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
-		}
-		log.Debugf("Withdraw: %s, pending balance is %s", this.excel.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
-		return this.newWithdrawErc20Tx(erc20.ContractAddr, to, withdrawAmount, DEFAULT_GAS_PRICE)
+		//balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, this.account.Address)
+		//if err != nil {
+		//	return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.excel.ContractAddress, err)
+		//}
+		//if balance.Cmp(amount) < 0 {
+		//	return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
+		//}
+		//log.Debugf("Withdraw: %s, pending balance is %s", this.excel.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
+		return this.newWithdrawErc20Tx(erc20.ContractAddr, to, amount, DEFAULT_GAS_PRICE)
 	}
 }
 

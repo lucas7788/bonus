@@ -9,6 +9,7 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"math/big"
 	"sync"
+	"github.com/ontio/bonus/utils"
 )
 
 type TxHandleTask struct {
@@ -58,7 +59,7 @@ func (self *TxHandleTask) updateTxCache(total int, txCaches map[string]*common.T
 	return txCaches, nil
 }
 
-func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, txCaches map[string]*common.TxCache, excel *common.ExcelParam, collectData map[string]*big.Int) (map[string]*common.TxCache, error) {
+func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, txCaches map[string]*common.TxCache, excel *common.ExcelParam, collectData map[string]*big.Int, decimal uint64) (map[string]*common.TxCache, error) {
 	defer close(self.verifyTxQueue)
 	collectDataLen := len(collectData)
 	if txCaches == nil {
@@ -108,6 +109,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, txCaches 
 				TxHex:    txHex,
 				TxStatus: common.OneTransfering,
 			}
+
 			txInfoArr[txInfoArrIndex] = &common.TransactionInfo{
 				Id:              index,
 				NetType:         excel.NetType,
@@ -115,7 +117,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, txCaches 
 				TokenType:       excel.TokenType,
 				ContractAddress: excel.ContractAddress,
 				Address:         addr,
-				Amount:          addr,
+				Amount:          utils.ToStringByPrecise(amt, decimal),
 				TxHash:          txHash,
 				TxTime:          0,
 				TxHex:           common2.ToHexString(txHex),

@@ -38,7 +38,6 @@ type OntManager struct {
 	decimals        int
 	txHandleTask    *transfer.TxHandleTask
 	stopChan        chan bool
-	txCache         map[string]*common2.TxCache // address -> txCache
 	collectData     map[string]*big.Int
 }
 
@@ -227,12 +226,11 @@ func (self *OntManager) StartTransfer() {
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
 	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
-		txCaches, err := self.txHandleTask.StartTxTask(self, self.txCache, self.excel, self.collectData,uint64(self.decimals))
+		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, uint64(self.decimals))
 		if err != nil {
 			log.Errorf("[StartTransfer] error: %s", err)
 			return
 		}
-		self.txCache = txCaches
 	}()
 }
 
@@ -473,7 +471,7 @@ func (self *OntManager) GetAdminBalance() (map[string]string, error) {
 func (self *OntManager) EstimateFee(tokenType string, total int) (string, error) {
 	tot := new(big.Int).SetUint64(uint64(total))
 	onePrice := new(big.Int).SetUint64(uint64(10000000))
-	fee := new(big.Int).Mul(tot,onePrice)
+	fee := new(big.Int).Mul(tot, onePrice)
 	return utils.ToStringByPrecise(fee, config.ONG_DECIMALS), nil
 }
 

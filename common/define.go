@@ -78,6 +78,6 @@ type WithdrawParam struct {
 type TxCache struct {
 	Addr     string
 	TxHash   string
-	TxHex    []byte
+	TxHex    string
 	TxStatus TxResult
 }

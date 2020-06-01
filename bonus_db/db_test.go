@@ -15,7 +15,7 @@ func init() {
 }
 
 func TestBonusDB_InsertTxInfoSql(t *testing.T) {
-	db, err := NewBonusDB(config.ONG, "eeee5", config.TestNet)
+	db, err := NewBonusDB(config.ONG, "eeee6", config.TestNet)
 	if err != nil {
 		fmt.Println("err:", err)
 		return

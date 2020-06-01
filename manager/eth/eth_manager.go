@@ -59,7 +59,6 @@ type EthManager struct {
 	nonce        uint64
 	txHandleTask *transfer.TxHandleTask
 	stopChan     chan bool
-	txCache      map[string]*common2.TxCache
 	collectData  map[string]*big.Int
 	decimals     uint64
 }
@@ -432,12 +431,11 @@ func (self *EthManager) StartTransfer() {
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE, self.stopChan)
 	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
-		txCaches, err := self.txHandleTask.StartTxTask(self, self.txCache, self.excel, self.collectData,self.decimals)
+		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, self.decimals)
 		if err != nil {
 			log.Errorf("[StartTransfer] error: %s", err)
 			return
 		}
-		self.txCache = txCaches
 	}()
 }
 

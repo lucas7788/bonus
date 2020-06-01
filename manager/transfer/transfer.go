@@ -64,36 +64,36 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		return err
 	}
 	newTxHexMap := make(map[string][]byte)
-	limit := 500
-	txInfoArr := make([]*common.TransactionInfo, limit)
+	limit := 200
+	txInfoArr := make([]common.TransactionInfo, limit)
 	txInfoArrIndex := 0
-	var txHash string
-	var txHex []byte
 	index := 0
+	log.Infof("collectData length: %d, txCaches length: %d", len(collectData), len(txCaches))
 	for addr, amt := range collectData {
+		index += 1
 		if txCaches[addr] != nil && txCaches[addr].TxStatus == common.TxSuccess {
 			continue
 		}
-		var err error
 		if txCaches[addr] != nil && txCaches[addr].TxStatus != common.TxSuccess {
 			txHex, err := hex.DecodeString(txCaches[addr].TxHex)
 			if err != nil {
 				panic(err)
 			}
 			self.verifyTxQueue <- verifyParam{
-				TxHash:   txHash,
+				TxHash:   txCaches[addr].TxHash,
 				TxHex:    txHex,
 				needSend: true,
 			}
 		} else if txCaches[addr] == nil {
-			txHash, txHex, err = mana.NewWithdrawTx(addr, amt, excel.TokenType)
+			log.Infof("txCaches[addr] == nil, index:%d", addr, index)
+			txHash, txHex, err := mana.NewWithdrawTx(addr, amt, excel.TokenType)
 			if err != nil {
 				log.Errorf("[StartTransfer] NewWithdrawTx failed: %s", err)
 				return err
 			}
 			newTxHexMap[addr] = txHex
 
-			txInfoArr[txInfoArrIndex] = &common.TransactionInfo{
+			txInfoArr[txInfoArrIndex] = common.TransactionInfo{
 				NetType:         excel.NetType,
 				EventType:       excel.EventType,
 				TokenType:       excel.TokenType,
@@ -107,31 +107,18 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 				ErrorDetail:     "",
 			}
 			txInfoArrIndex += 1
-			if txInfoArrIndex == limit-1 || index == collectDataLen-1 {
-				err := self.db.InsertTxInfoSql(txInfoArr)
+			if txInfoArrIndex >= limit-1 || index >= collectDataLen-1 {
+				err = self.insertAndSendTx(mana, txInfoArr, newTxHexMap)
 				if err != nil {
-					log.Errorf("[StartTransfer] InsertTxInfoSql failed: %s", err)
+					log.Errorf("[StartTransfer] insertAndSendTx failed: %s", err)
 					return err
 				}
 				for j := 0; j < len(txInfoArr); j++ {
-					if txInfoArr[j] == nil {
-						continue
-					}
-					txHash, err := mana.SendTx(newTxHexMap[txInfoArr[j].Address])
-					if err != nil {
-						log.Errorf("[StartTransfer] SendTx error: %s", err)
-						return err
-					}
-					log.Infof("tx send success, txhash:%s", txHash)
-					self.verifyTxQueue <- verifyParam{
-						TxHash: txHash,
-					}
-					txInfoArr[j] = nil
+					txInfoArr[j] = common.TransactionInfo{}
 				}
 				txInfoArrIndex = 0
 			}
 		}
-		index += 1
 		select {
 		case <-self.stopChan:
 			log.Infof("[StartTransfer] stopChan, address: %s", addr)
@@ -140,47 +127,35 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 			continue
 		}
 	}
+	err = self.insertAndSendTx(mana, txInfoArr, newTxHexMap)
+	if err != nil {
+		log.Infof("[StartTransfer] for end insertAndSendTx, error: %s", err)
+		return err
+	}
 	return nil
 }
 
-func (this *TxHandleTask) UpdateTxInfoTable(mana interfaces.WithdrawManager, eatp *common.ExcelParam) (map[int]bool, error) {
-	txInfos := make([]*common.TransactionInfo, 0)
-	hasBuildTxId := make(map[int]bool)
-	//update tx info table
-	for _, trParam := range eatp.BillList {
-		if trParam == nil {
-			log.Errorf("trparam is nil")
+func (this *TxHandleTask) insertAndSendTx(mana interfaces.WithdrawManager, txInfoArr []common.TransactionInfo, newTxHexMap map[string][]byte) error {
+	err := this.db.InsertTxInfoSql(txInfoArr)
+	if err != nil {
+		log.Errorf("[StartTransfer] InsertTxInfoSql failed: %s", err)
+		return err
+	}
+	for j := 0; j < len(txInfoArr); j++ {
+		if txInfoArr[j].TxHash == "" {
 			continue
 		}
-		tx, err := this.db.QueryTxHexByExcelAndAddr(eatp.EventType, trParam.Address, trParam.Id)
+		txHash, err := mana.SendTx(newTxHexMap[txInfoArr[j].Address])
 		if err != nil {
-			log.Errorf("QueryTxHexByExcelAndAddr error: %s, eventType:%s, address:%s, id: %d", err, eatp.EventType, trParam.Address, trParam.Id)
-			continue
+			log.Errorf("[StartTransfer] SendTx error: %s", err)
+			return err
 		}
-		if tx == nil {
-			txInfo := &common.TransactionInfo{
-				Id:              trParam.Id,
-				EventType:       eatp.EventType,
-				TokenType:       eatp.TokenType,
-				ContractAddress: eatp.ContractAddress,
-				Address:         trParam.Address,
-				Amount:          trParam.Amount,
-				NetType:         mana.GetNetType(),
-				TxResult:        common.NotBuild,
-			}
-			txInfos = append(txInfos, txInfo)
-		} else {
-			hasBuildTxId[trParam.Id] = true
+		log.Infof("tx send success, txhash:%s", txHash)
+		this.verifyTxQueue <- verifyParam{
+			TxHash: txHash,
 		}
 	}
-	if len(txInfos) > 0 {
-		err := this.db.InsertTxInfoSql(txInfos)
-		if err != nil {
-			log.Errorf("InsertTxInfoSql error:%s", err)
-			return nil, err
-		}
-	}
-	return hasBuildTxId, nil
+	return nil
 }
 
 func (self *TxHandleTask) WaitClose() {
@@ -192,7 +167,7 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 	for {
 		select {
 		case verifyP, ok := <-self.verifyTxQueue:
-			if !ok {
+			if !ok || verifyP.TxHash == "" {
 				self.TransferStatus = common.Transfered
 				log.Info("exit StartVerifyTxTask gorountine")
 				return
@@ -205,7 +180,6 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 					_, err = mana.SendTx(verifyP.TxHex)
 					if err != nil {
 						log.Errorf("[StartVerifyTxTask] send tx failed: %s", err)
-						continue
 					}
 					boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
 					if err != nil {

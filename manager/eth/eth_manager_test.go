@@ -27,7 +27,7 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 	eth := &config.Eth{
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		//RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-		RpcAddrTestNet:"http://18.140.187.37:10331",
+		RpcAddrTestNet: "http://18.140.187.37:10331",
 	}
 
 	eatp := &common.ExcelParam{

@@ -58,17 +58,17 @@ func (this *BonusDB) Close() {
 	this.db.Close()
 }
 
-func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
+func (this *BonusDB) InsertTxInfoSql(args []common.TransactionInfo) error {
 	sqlStrArr := make([]string, 0)
 	for _, txInfo := range args {
-		if txInfo == nil {
+		if txInfo.TxHash == "" {
 			continue
 		}
 		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.NetType, txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex, txInfo.TxResult, txInfo.ErrorDetail)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
 	if len(sqlStrArr) == 0 {
-		return fmt.Errorf("database has the same data")
+		return nil
 	}
 	content := strings.Join(sqlStrArr, ",")
 	strSql := "insert into bonus_transaction_info (NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
@@ -156,9 +156,9 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[strin
 func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
 	var strSql string
 	if txResult == common.AllStatus {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and NetType=?"
 	} else {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
 	}
 
 	stmt, err := this.db.Prepare(strSql)
@@ -413,9 +413,9 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, pageSize in
 func (this *BonusDB) getTxInfoTotal(eventType string, txResult common.TxResult) (int, error) {
 	var strSql string
 	if txResult == common.AllStatus {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=?"
 	} else {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and TxResult=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and TxResult=?"
 	}
 
 	stmt, err := this.db.Prepare(strSql)

@@ -6,13 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
-	"github.com/ontio/bonus/bonus_db"
 )
 
 var DefBonusMap = new(sync.Map) // evttype + nettype -> withdraw-mgr

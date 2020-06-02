@@ -9,10 +9,9 @@ import (
 var Version = ""
 
 var (
-	EthOneGwei            = new(big.Int).SetUint64(uint64(1000000000))
-	ETH_DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", ETH_DECIMALS).Uint64() // 40 Gwei
-	ETH_MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", ETH_DECIMALS).Uint64()
-	ONT_DEFAULT_GAS_LIMIT = 2000000
+	OneGwei           = new(big.Int).SetUint64(uint64(1000000000))
+	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000001", ETH_DECIMALS) // 10 Gwei
+	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", ETH_DECIMALS)
 )
 
 var DefConfig = &Config{
@@ -28,7 +27,7 @@ var DefConfig = &Config{
 	EthCfg: &Eth{
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-		GasPrice:       ETH_DEFAULT_GAS_PRICE,
+		GasPrice:       10, //10 Gwei
 	},
 }
 

@@ -14,8 +14,12 @@ import (
 	"time"
 )
 
-func TestEthManager_NewWithdrawTx(t *testing.T) {
+func TestEthManager_ComputeSum(t *testing.T) {
+	res := new(big.Int).Div(DEFAULT_GAS_PRICE, new(big.Int).SetUint64(uint64(10)))
+	assert.Equal(t, res, OneGwei)
+}
 
+func TestEthManager_NewWithdrawTx(t *testing.T) {
 	gwei := new(big.Int).SetUint64(uint64(1000000000))
 	fmt.Println(gwei)
 	a, _ := new(big.Int).SetString("1000000000", 10)
@@ -34,7 +38,7 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 		TokenType: config.ETH,
 		EventType: "test",
 	}
-	manager, err := NewEthManager(eth, eatp, config.TestNet, nil)
+	manager, err := NewEthManager(eth, eatp, config.TestNet)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
@@ -61,7 +65,7 @@ func TestEthManager_Withdraw(t *testing.T) {
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
 
-	manager, err := NewEthManager(eth, nil, config.MainNet, nil)
+	manager, err := NewEthManager(eth, nil, config.MainNet)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
@@ -94,7 +98,7 @@ func TestNewEthManager(t *testing.T) {
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, err := NewEthManager(eth, nil, config.TestNet, nil)
+	manager, err := NewEthManager(eth, nil, config.TestNet)
 	assert.Nil(t, err)
 	assert.NotEqual(t, nil, manager)
 }
@@ -107,7 +111,7 @@ func TestEthManager_GetTxTime(t *testing.T) {
 		//Account:  "0x79dd7951f80c7184259935272e2fe69fa00f2aae",
 		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
 	}
-	manager, _ := NewEthManager(eth, nil, config.TestNet, nil)
+	manager, _ := NewEthManager(eth, nil, config.TestNet)
 
 	ti, err := manager.GetTxTime("0x4df8e59e05a1f89cfa70b0db8d00c70e623cccbea07b53c36bc5b5ac041ca4f8")
 	assert.Nil(t, err)
@@ -142,7 +146,7 @@ func TestEthManager_EstimateFee(t *testing.T) {
 		Sum:             "",
 		AdminBalance:    nil,
 	}
-	manager, err := NewEthManager(eth, eatp, config.TestNet, nil)
+	manager, err := NewEthManager(eth, eatp, config.TestNet)
 	if err != nil {
 		fmt.Println("NewEthManager:", err)
 	}

@@ -33,7 +33,7 @@ import (
 
 var (
 	OneGwei           = new(big.Int).SetUint64(uint64(1000000000))
-	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", config.ETH_DECIMALS) // 40 Gwei
+	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", config.ETH_DECIMALS) // 10 Gwei
 	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", config.ETH_DECIMALS)
 )
 
@@ -261,9 +261,9 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	if err != nil {
 		return "", err
 	}
-	if total > 1 {
-		gaslimit = gaslimit * 2
-	}
+	//if total > 1 {
+	//	gaslimit = gaslimit * 2
+	//}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
 	gas := new(big.Int).Mul(gasLimi, DEFAULT_GAS_PRICE)
 	gasTotal := new(big.Int).Mul(gas, new(big.Int).SetUint64(uint64(total)))

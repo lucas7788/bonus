@@ -33,7 +33,7 @@ import (
 
 var (
 	OneGwei           = new(big.Int).SetUint64(uint64(1000000000))
-	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", config.ETH_DECIMALS) // 10 Gwei
+	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000002", config.ETH_DECIMALS) // 20 Gwei
 	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", config.ETH_DECIMALS)
 )
 

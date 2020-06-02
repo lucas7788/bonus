@@ -224,6 +224,7 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) StartTransfer() {
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE, self.stopChan)
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
+	go self.txHandleTask.StartSendTxTask(self)
 	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
 		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, uint64(self.decimals))

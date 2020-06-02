@@ -429,6 +429,7 @@ func (self *EthManager) Stop() {
 
 func (self *EthManager) StartTransfer() {
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ETH_TRANSFER_QUEUE_SIZE, self.stopChan)
+	go self.txHandleTask.StartSendTxTask(self)
 	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
 		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, self.decimals)

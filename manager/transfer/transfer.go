@@ -14,14 +14,14 @@ import (
 )
 
 type TxHandleTask struct {
-	verifyTxQueue      chan verifyParam
-	hasTransferedOntid map[string]bool
-	CloseChan          chan bool
-	rwLock             *sync.RWMutex
-	TransferStatus     common.TransferStatus
-	TokenType          string
-	db                 *bonus_db.BonusDB
-	stopChan           chan bool
+	sendTxQueue    chan []sendTxParam
+	verifyTxQueue  chan []verifyParam
+	CloseChan      chan bool
+	rwLock         *sync.RWMutex
+	TransferStatus common.TransferStatus
+	TokenType      string
+	db             *bonus_db.BonusDB
+	stopChan       chan bool
 }
 
 type verifyParam struct {
@@ -30,9 +30,16 @@ type verifyParam struct {
 	needSend bool
 }
 
+type sendTxParam struct {
+	txHash string
+	txHex  []byte
+}
+
 func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int, stopChan chan bool) *TxHandleTask {
-	verifyQueue := make(chan verifyParam, txQueueSize/2)
+	verifyQueue := make(chan []verifyParam, txQueueSize)
+	sendTxQueue := make(chan []sendTxParam, txQueueSize)
 	return &TxHandleTask{
+		sendTxQueue:    sendTxQueue,
 		verifyTxQueue:  verifyQueue,
 		TransferStatus: common.Transfering,
 		CloseChan:      make(chan bool),
@@ -56,7 +63,7 @@ func (self *TxHandleTask) updateTxCache(total int, txCaches map[string]*common.T
 }
 
 func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *common.ExcelParam, collectData map[string]*big.Int, decimal uint64) error {
-	defer close(self.verifyTxQueue)
+	defer close(self.sendTxQueue)
 	collectDataLen := len(collectData)
 	txCaches, err := self.db.QueryTxInfo()
 	if err != nil {
@@ -79,20 +86,20 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 			if err != nil {
 				panic(err)
 			}
-			self.verifyTxQueue <- verifyParam{
-				TxHash:   txCaches[addr].TxHash,
-				TxHex:    txHex,
-				needSend: true,
+			self.verifyTxQueue <- []verifyParam{
+				verifyParam{
+					TxHash:   txCaches[addr].TxHash,
+					TxHex:    txHex,
+					needSend: true,
+				},
 			}
 		} else if txCaches[addr] == nil {
-			log.Infof("txCaches[addr] == nil, index:%d", addr, index)
 			txHash, txHex, err := mana.NewWithdrawTx(addr, amt, excel.TokenType)
 			if err != nil {
 				log.Errorf("[StartTransfer] NewWithdrawTx failed: %s", err)
 				return err
 			}
 			newTxHexMap[addr] = txHex
-
 			txInfoArr[txInfoArrIndex] = common.TransactionInfo{
 				NetType:         excel.NetType,
 				EventType:       excel.EventType,
@@ -113,9 +120,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 					log.Errorf("[StartTransfer] insertAndSendTx failed: %s", err)
 					return err
 				}
-				for j := 0; j < len(txInfoArr); j++ {
-					txInfoArr[j] = common.TransactionInfo{}
-				}
+				txInfoArr = make([]common.TransactionInfo, limit)
 				txInfoArrIndex = 0
 			}
 		}
@@ -141,21 +146,42 @@ func (this *TxHandleTask) insertAndSendTx(mana interfaces.WithdrawManager, txInf
 		log.Errorf("[StartTransfer] InsertTxInfoSql failed: %s", err)
 		return err
 	}
-	for j := 0; j < len(txInfoArr); j++ {
-		if txInfoArr[j].TxHash == "" {
+	param := make([]sendTxParam, len(txInfoArr))
+	for i := 0; i < len(txInfoArr); i++ {
+		if txInfoArr[i].TxHash == "" {
 			continue
 		}
-		txHash, err := mana.SendTx(newTxHexMap[txInfoArr[j].Address])
-		if err != nil {
-			log.Errorf("[StartTransfer] SendTx error: %s", err)
-			return err
-		}
-		log.Infof("tx send success, txhash:%s", txHash)
-		this.verifyTxQueue <- verifyParam{
-			TxHash: txHash,
+		param[i] = sendTxParam{
+			txHash: txInfoArr[i].TxHash,
+			txHex:  newTxHexMap[txInfoArr[i].Address],
 		}
 	}
+	this.sendTxQueue <- param
 	return nil
+}
+
+func (self *TxHandleTask) StartSendTxTask(mana interfaces.WithdrawManager) {
+	defer func() {
+		log.Info("exit StartSendTxTask gorountine")
+		close(self.verifyTxQueue)
+	}()
+
+	for param := range self.sendTxQueue {
+		verifyP := make([]verifyParam, len(param))
+		for i := 0; i < len(param); i++ {
+			if param[i].txHash == "" {
+				continue
+			}
+			txHash, err := mana.SendTx(param[i].txHex)
+			if err != nil {
+				log.Errorf("[StartTransfer] SendTx error: %s", err)
+				return
+			}
+			verifyP[i].TxHash = txHash
+		}
+		self.verifyTxQueue <- verifyP
+	}
+
 }
 
 func (self *TxHandleTask) WaitClose() {
@@ -163,15 +189,8 @@ func (self *TxHandleTask) WaitClose() {
 }
 
 func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
-
-	for {
-		select {
-		case verifyP, ok := <-self.verifyTxQueue:
-			if !ok || verifyP.TxHash == "" {
-				self.TransferStatus = common.Transfered
-				log.Info("exit StartVerifyTxTask gorountine")
-				return
-			}
+	for param := range self.verifyTxQueue {
+		for _, verifyP := range param {
 			var boo bool
 			var err error
 			boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
@@ -211,4 +230,5 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 			log.Debugf("verify tx success, txhash: %s", verifyP.TxHash)
 		}
 	}
+	log.Info("exit StartVerifyTxTask gorountine")
 }

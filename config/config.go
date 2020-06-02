@@ -52,7 +52,7 @@ var (
 	DEFAULT_REST_PORT = uint(20327)
 
 	ONT_TRANSFER_QUEUE_SIZE = 5000
-	ETH_TRANSFER_QUEUE_SIZE = 200
+	ETH_TRANSFER_QUEUE_SIZE = 500
 	All_TOKEN_TYPE          []string //need init when server start, //TODO
 )
 

@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", config.ETH_DECIMALS) // 40 Gwei
+	DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000001", config.ETH_DECIMALS) // 10 Gwei
 	MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", config.ETH_DECIMALS)
 )
 

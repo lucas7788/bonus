@@ -99,10 +99,25 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	}
 	log.Infof("eth admin address: %s", account.Address.Hex())
 
-	gasPrice := config.DEFAULT_GAS_PRICE
+	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Errorf("eth suggest gas price: %s", gasPrice.Uint64())
+		return nil, err
+	}
+	//使用配置的gasprice
 	if cfg.GasPrice != 0 {
 		temp := new(big.Int).SetUint64(cfg.GasPrice)
 		gasPrice = new(big.Int).Mul(config.OneGwei, temp)
+	} else {
+		//设置最大值
+		temp := new(big.Int).Div(gasPrice, config.OneGwei)
+		if temp.Uint64() > 50 {
+			temp = temp.SetUint64(uint64(50))
+			gasPrice = new(big.Int).Mul(config.OneGwei, temp)
+		} else if temp.Uint64() < 10 {
+			temp = temp.SetUint64(uint64(10))
+			gasPrice = new(big.Int).Mul(config.OneGwei, temp)
+		}
 	}
 	log.Infof("oneGwei: %d, GasPrice: %d", config.OneGwei.Uint64(), gasPrice.Uint64())
 	mgr := &EthManager{
@@ -501,22 +516,22 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		}
 		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
 		if err != nil {
-			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
+			return 0, fmt.Errorf("estimateGasLimit: pre-execute failed, err: %s", err)
 		}
 		return gasLimit * 2, nil
 	} else if tokenType == config.ERC20 {
 		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 		if err != nil {
-			return 0, fmt.Errorf("newWithdrawErc20Tx: pack tx data failed, err: %s", err)
+			return 0, fmt.Errorf("estimateGasLimit: pack tx data failed, err: %s", err)
 		}
-		to := ethComm.HexToAddress("0xd46e8dd67c5d32be8058bb8eb970870f07244567")
+		to = ethComm.HexToAddress("0xd46e8dd67c5d32be8058bb8eb970870f07244567")
 		callMsg := ethereum.CallMsg{
 			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
 			Value: big.NewInt(0), Data: txData,
 		}
 		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
 		if err != nil {
-			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
+			return 0, fmt.Errorf("estimateGasLimit: pre-execute failed, err: %s", err)
 		}
 		return gasLimit * 2, nil
 	} else {

@@ -323,6 +323,7 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 		log.Errorf("EstimateFee error: %s", err)
 		return EstimateFeeError
 	}
+
 	excelParam.Admin = mgr.GetAdminAddress()
 	excelParam.Total = mgr.GetTotal()
 	return SUCCESS

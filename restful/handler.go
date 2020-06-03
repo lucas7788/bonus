@@ -283,10 +283,26 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 	}
-	fee, err := mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
-	if err != nil {
-		log.Errorf("EstimateFee error: %s", err)
-		return writeResponse(ctx, ResponsePack(EstimateFeeError))
+	var fee string
+	if mgr.GetExcelParam().TokenType == config.ERC20 || mgr.GetExcelParam().TokenType == config.ETH {
+		balance, err := mgr.GetAdminBalance()
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return writeResponse(ctx, ResponsePack(EstimateFeeError))
+		}
+		if balance[config.ETH] > "0.005" && balance[config.ERC20] > "1" {
+			fee, err = mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
+			if err != nil {
+				log.Errorf("EstimateFee error: %s", err)
+				return writeResponse(ctx, ResponsePack(EstimateFeeError))
+			}
+		}
+	} else {
+		fee, err = mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return writeResponse(ctx, ResponsePack(EstimateFeeError))
+		}
 	}
 	res := &common.GetTxInfoByEvtType{
 		TxInfo:          txInfo,
@@ -320,7 +336,7 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 	}
 	log.Info("AdminBalance", excelParam.AdminBalance[excelParam.TokenType])
 	if excelParam.TokenType == config.ERC20 {
-		if excelParam.AdminBalance[excelParam.TokenType] != "0" && excelParam.AdminBalance[config.ETH] != "0" {
+		if excelParam.AdminBalance[excelParam.TokenType] > "1" && excelParam.AdminBalance[config.ETH] > "0.005" {
 			excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
 			if err != nil {
 				log.Errorf("EstimateFee error: %s", err)

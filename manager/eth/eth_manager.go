@@ -268,17 +268,12 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	// TODO: FIX HERE
-	var amountStr string
-	for _, i := range self.excel.BillList {
-		if i.Amount != "" {
-			amountStr = i.Amount
-			break
-		}
-	}
 	var amount *big.Int
 	if tokenType == config.ETH {
+		amountStr := "0.005"
 		amount = utils.ToIntByPrecise(amountStr, config.ETH_DECIMALS)
 	} else if tokenType == config.ERC20 {
+		amountStr := "1"
 		amount = utils.ToIntByPrecise(amountStr, self.tokens[self.excel.ContractAddress].Decimals)
 	}
 	gaslimit, err := self.estimateGasLimit(tokenType, contractAddr, adminAddress, amount, self.gasPrice)

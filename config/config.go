@@ -41,7 +41,6 @@ type Config struct {
 
 const (
 	LogPath           = "./Log"
-	DefaultWalletPath = "./wallet"
 	DBPath            = "db"
 )
 
@@ -51,7 +50,6 @@ var (
 
 	ONT_TRANSFER_QUEUE_SIZE = 100
 	ETH_TRANSFER_QUEUE_SIZE = 20
-	All_TOKEN_TYPE          []string //need init when server start, //TODO
 )
 
 type Ont struct {

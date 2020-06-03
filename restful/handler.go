@@ -318,12 +318,22 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 		log.Errorf("GetAdminBalance error: %s", err)
 		return GetAdminBalanceError
 	}
-	excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
-	if err != nil {
-		log.Errorf("EstimateFee error: %s", err)
-		return EstimateFeeError
+	log.Info("AdminBalance", excelParam.AdminBalance[excelParam.TokenType])
+	if excelParam.TokenType == config.ERC20 {
+		if excelParam.AdminBalance[excelParam.TokenType] != "0" && excelParam.AdminBalance[config.ETH] != "0" {
+			excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
+			if err != nil {
+				log.Errorf("EstimateFee error: %s", err)
+				return EstimateFeeError
+			}
+		}
+	} else {
+		excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return EstimateFeeError
+		}
 	}
-
 	excelParam.Admin = mgr.GetAdminAddress()
 	excelParam.Total = mgr.GetTotal()
 	return SUCCESS

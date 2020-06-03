@@ -106,6 +106,9 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	}
 	//使用配置的gasprice
 	if cfg.GasPrice != 0 {
+		if cfg.GasPrice < 10 || cfg.GasPrice > 50 {
+			cfg.GasPrice = 10
+		}
 		temp := new(big.Int).SetUint64(cfg.GasPrice)
 		gasPrice = new(big.Int).Mul(config.OneGwei, temp)
 	} else {
@@ -119,6 +122,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 			gasPrice = new(big.Int).Mul(config.OneGwei, temp)
 		}
 	}
+
 	log.Infof("oneGwei: %d, GasPrice: %d", config.OneGwei.Uint64(), gasPrice.Uint64())
 	mgr := &EthManager{
 		tokens:       make(map[string]*Token),
@@ -264,7 +268,19 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	adminAddr := self.GetAdminAddress()
 	adminAddress := ethComm.HexToAddress(adminAddr)
 	// TODO: FIX HERE
-	amount := utils.ToIntByPrecise("100", config.ETH_DECIMALS)
+	var amountStr string
+	for _, i := range self.excel.BillList {
+		if i.Amount != "" {
+			amountStr = i.Amount
+			break
+		}
+	}
+	var amount *big.Int
+	if tokenType == config.ETH {
+		amount = utils.ToIntByPrecise(amountStr, config.ETH_DECIMALS)
+	} else if tokenType == config.ERC20 {
+		amount = utils.ToIntByPrecise(amountStr, self.tokens[self.excel.ContractAddress].Decimals)
+	}
 	gaslimit, err := self.estimateGasLimit(tokenType, contractAddr, adminAddress, amount, self.gasPrice)
 	if err != nil {
 		return "", err
@@ -524,9 +540,9 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("estimateGasLimit: pack tx data failed, err: %s", err)
 		}
-		to = ethComm.HexToAddress("0xd46e8dd67c5d32be8058bb8eb970870f07244567")
+		//to = ethComm.HexToAddress("0xd46e8dd67c5d32be8058bb8eb970870f07244567")
 		callMsg := ethereum.CallMsg{
-			From: this.account.Address, To: &to, Gas: 0, GasPrice: gasPrice,
+			From: this.account.Address, To: &contractAddr, Gas: 0, GasPrice: gasPrice,
 			Value: big.NewInt(0), Data: txData,
 		}
 		gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)

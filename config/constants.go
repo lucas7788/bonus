@@ -21,7 +21,7 @@ const (
 )
 
 const (
-	RetryLimit    = 6
+	RetryLimit    = 30
 	SleepTime     = 3
 	EthSendTxSlot = 20
 	EthSleepTime  = 6

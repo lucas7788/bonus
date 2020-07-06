@@ -51,11 +51,11 @@ func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawMa
 	switch tokenType {
 	case config.ONG, config.OEP4, config.ONT:
 		// init ont mgr in working-path
-		cfg, eatp, err := ont.LoadOntManager(tokenType, eventType)
+		_, eatp, err := ont.LoadOntManager(tokenType, eventType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load ont mgr: %s", err)
 		}
-		ontManager, err := ont.NewOntManager(cfg, eatp, netType)
+		ontManager, err := ont.NewOntManager(config.DefConfig.OntCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}
@@ -63,11 +63,11 @@ func RecoverManager(tokenType, eventType, netType string) (interfaces.WithdrawMa
 		return ontManager, nil
 	case config.ERC20, config.ETH:
 		// init eth mgr in working-path
-		cfg, eatp, err := eth.LoadEthManager(tokenType, eventType)
+		_, eatp, err := eth.LoadEthManager(tokenType, eventType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load eth mgr: %s", err)
 		}
-		ethManager, err := eth.NewEthManager(cfg, eatp, netType)
+		ethManager, err := eth.NewEthManager(config.DefConfig.EthCfg, eatp, netType)
 		if err != nil {
 			return nil, err
 		}

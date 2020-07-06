@@ -29,7 +29,6 @@ type verifyParam struct {
 	needSend bool
 }
 
-
 func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int, stopChan chan bool) *TxHandleTask {
 	verifyQueue := make(chan verifyParam, txQueueSize)
 	return &TxHandleTask{

@@ -16,14 +16,6 @@ import (
 
 func TestEthManager_NewWithdrawTx(t *testing.T) {
 
-	gwei := new(big.Int).SetUint64(uint64(1000000000))
-	fmt.Println(gwei)
-	a, _ := new(big.Int).SetString("1000000000", 10)
-	fmt.Println(a)
-
-	res := new(big.Int)
-	res = res.Div(DEFAULT_GAS_PRICE, gwei)
-	fmt.Println(res)
 	eth := &config.Eth{
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
 		//RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
@@ -32,7 +24,7 @@ func TestEthManager_NewWithdrawTx(t *testing.T) {
 
 	eatp := &common.ExcelParam{
 		BillList:  nil,
-		TokenType: config.ETH,
+		TokenType: config.ERC20,
 		EventType: "test",
 	}
 	manager, err := NewEthManager(eth, eatp, config.TestNet)

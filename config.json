@@ -8,7 +8,8 @@
     "gas_limit":2000000
   },
   "eth_cfg":{
-    "rpc_addr_test_net": "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+    "gas_price":20,
+    "rpc_addr_test_net": "http://18.140.187.37:10331",
     "rpc_addr_main_net": "http://onto-eth.ont.io:10331",
     "tokens": [
       {

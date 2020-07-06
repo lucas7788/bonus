@@ -142,8 +142,8 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	}
 
 	mgr.initCollectData()
-	log.Info("NewEthManager success, gasPrice: %d, decimals:%d, netTy:%s, nounce:%d",
-		mgr.gasPrice.Uint64(), mgr.decimals, mgr.netType, mgr.nonce)
+	log.Infof("NewEthManager success, gasPrice: %d, decimals:%d, netTy:%s, nounce:%d",
+		cfg.GasPrice, mgr.decimals, mgr.netType, mgr.nonce)
 	return mgr, nil
 }
 
@@ -272,16 +272,19 @@ func (self *EthManager) GetAdminBalance() (map[string]string, error) {
 
 func (self *EthManager) EstimateFee(tokenType string, total int) (string, error) {
 	contractAddr := ethComm.HexToAddress(self.excel.ContractAddress)
-	adminAddr := self.GetAdminAddress()
-	adminAddress := ethComm.HexToAddress(adminAddr)
+	adminAddress := self.account.Address
 	// TODO: FIX HERE
-	amount := utils.ToIntByPrecise("2000", config.ETH_DECIMALS)
+	var amount *big.Int
+	if tokenType == config.ETH {
+		amountStr := "0.005"
+		amount = utils.ToIntByPrecise(amountStr, config.ETH_DECIMALS)
+	} else if tokenType == config.ERC20 {
+		amountStr := "1"
+		amount = utils.ToIntByPrecise(amountStr, self.tokens[self.excel.ContractAddress].Decimals)
+	}
 	gaslimit, err := self.estimateGasLimit(tokenType, contractAddr, adminAddress, amount, self.gasPrice)
 	if err != nil {
 		return "", err
-	}
-	if total > 1 {
-		gaslimit = gaslimit * 2
 	}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
 	gas := new(big.Int).Mul(gasLimi, self.gasPrice)
@@ -519,7 +522,7 @@ func (this *EthManager) newWithdrawErc20Tx(contractAddr, to ethComm.Address, amo
 	}
 	gasLimit, err := this.estimateGasLimit(config.ERC20, contractAddr, to, amount, gasPrice)
 	if err != nil {
-		return "", nil, fmt.Errorf("EstimateGasLimit error:%s", err)
+		return "", nil, fmt.Errorf("newWithdrawErc20Tx error:%s", err)
 	}
 	return this.newTx(contractAddr, big.NewInt(0), gasLimit, gasPrice, txData)
 }

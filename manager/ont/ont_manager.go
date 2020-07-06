@@ -113,6 +113,8 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 		}
 	}
 	mgr.initCollectData()
+	log.Infof("NewOntManager success, gasPrice: %d, decimals:%d, netTy:%s",
+		cfg.GasPrice, mgr.decimals, mgr.netType)
 	return mgr, nil
 }
 

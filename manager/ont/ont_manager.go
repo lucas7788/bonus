@@ -224,7 +224,6 @@ func (self *OntManager) VerifyAddress(address string) bool {
 func (self *OntManager) StartTransfer() {
 	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE, self.stopChan)
 	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
-	go self.txHandleTask.StartSendTxTask(self)
 	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
 		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, uint64(self.decimals))
@@ -373,17 +372,8 @@ func (self *OntManager) NewWithdrawTx(destAddr string, amount *big.Int, tokenTyp
 	}
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
-		var sts []ont.State
-		sts = append(sts, ont.State{
-			From:  self.account.Address,
-			To:    address,
-			Value: amount.Uint64(),
-		})
-		params := ont.Transfers{
-			States: sts,
-		}
-		tx, err = self.ontSdk.Native.NewNativeInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit,
-			OntIDVersion, sdk.ONT_CONTRACT_ADDRESS, "transfer", []interface{}{params})
+		tx, err = self.ontSdk.Native.Ont.NewTransferTransaction(self.cfg.GasPrice,
+			self.cfg.GasLimit, self.account.Address, address, amount.Uint64())
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ont, this.ontologySdk.Native.NewNativeInvokeTransaction error: %s", err)
 		}
@@ -392,17 +382,8 @@ func (self *OntManager) NewWithdrawTx(destAddr string, amount *big.Int, tokenTyp
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
-		var sts []ont.State
-		sts = append(sts, ont.State{
-			From:  self.account.Address,
-			To:    address,
-			Value: amount.Uint64(),
-		})
-		params := ont.Transfers{
-			States: sts,
-		}
-		tx, err = self.ontSdk.Native.NewNativeInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit,
-			OntIDVersion, sdk.ONG_CONTRACT_ADDRESS, "transfer", []interface{}{params})
+		tx, err = self.ontSdk.Native.Ong.NewTransferTransaction(self.cfg.GasPrice,
+			self.cfg.GasLimit, self.account.Address, address, amount.Uint64())
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.Native.NewNativeInvokeTransaction error: %s", err)
 		}

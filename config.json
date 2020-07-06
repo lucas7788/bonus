@@ -2,9 +2,9 @@
   "rest_port":8080,
   "version":"1.0.0",
   "ont_cfg": {
-    "rpc_addr_test_net":"http://polaris1.ont.io:20336",
+    "rpc_addr_test_net":"http://polaris2.ont.io:20336",
     "rpc_addr_main_net":"http://dappnode1.ont.io:20336",
-    "gas_price":500,
+    "gas_price":2500,
     "gas_limit":2000000
   },
   "eth_cfg":{

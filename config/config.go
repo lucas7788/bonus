@@ -22,7 +22,7 @@ var DefConfig = &Config{
 	OntCfg: &Ont{
 		OntJsonRpcAddressMainNet: "http://dappnode1.ont.io:20336",
 		OntJsonRpcAddressTestNet: "http://polaris1.ont.io:20336",
-		GasPrice:                 500,
+		GasPrice:                 2500,
 		GasLimit:                 2000000,
 	},
 	EthCfg: &Eth{

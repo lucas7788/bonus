@@ -14,8 +14,7 @@ import (
 )
 
 type TxHandleTask struct {
-	sendTxQueue    chan []sendTxParam
-	verifyTxQueue  chan []verifyParam
+	verifyTxQueue  chan verifyParam
 	CloseChan      chan bool
 	rwLock         *sync.RWMutex
 	TransferStatus common.TransferStatus
@@ -30,16 +29,10 @@ type verifyParam struct {
 	needSend bool
 }
 
-type sendTxParam struct {
-	txHash string
-	txHex  []byte
-}
 
 func NewTxHandleTask(tokenType string, db *bonus_db.BonusDB, txQueueSize int, stopChan chan bool) *TxHandleTask {
-	verifyQueue := make(chan []verifyParam, txQueueSize)
-	sendTxQueue := make(chan []sendTxParam, txQueueSize)
+	verifyQueue := make(chan verifyParam, txQueueSize)
 	return &TxHandleTask{
-		sendTxQueue:    sendTxQueue,
 		verifyTxQueue:  verifyQueue,
 		TransferStatus: common.Transfering,
 		CloseChan:      make(chan bool),
@@ -63,7 +56,6 @@ func (self *TxHandleTask) updateTxCache(total int, txCaches map[string]*common.T
 }
 
 func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *common.ExcelParam, collectData map[string]*big.Int, decimal uint64) error {
-	defer close(self.sendTxQueue)
 	collectDataLen := len(collectData)
 	txCaches, err := self.db.QueryTxInfo()
 	if err != nil {
@@ -86,12 +78,10 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 			if err != nil {
 				panic(err)
 			}
-			self.verifyTxQueue <- []verifyParam{
-				verifyParam{
-					TxHash:   txCaches[addr].TxHash,
-					TxHex:    txHex,
-					needSend: true,
-				},
+			self.verifyTxQueue <- verifyParam{
+				TxHash:   txCaches[addr].TxHash,
+				TxHex:    txHex,
+				needSend: true,
 			}
 		} else if txCaches[addr] == nil {
 			txHash, txHex, err := mana.NewWithdrawTx(addr, amt, excel.TokenType)
@@ -146,42 +136,20 @@ func (this *TxHandleTask) insertAndSendTx(mana interfaces.WithdrawManager, txInf
 		log.Errorf("[StartTransfer] InsertTxInfoSql failed: %s", err)
 		return err
 	}
-	param := make([]sendTxParam, len(txInfoArr))
 	for i := 0; i < len(txInfoArr); i++ {
 		if txInfoArr[i].TxHash == "" {
 			continue
 		}
-		param[i] = sendTxParam{
-			txHash: txInfoArr[i].TxHash,
-			txHex:  newTxHexMap[txInfoArr[i].Address],
+		txHash, err := mana.SendTx(newTxHexMap[txInfoArr[i].Address])
+		if err != nil {
+			log.Errorf("SendTx failed: %s, txhash: %s\n", err, txHash)
+			return err
+		}
+		this.verifyTxQueue <- verifyParam{
+			TxHash: txHash,
 		}
 	}
-	this.sendTxQueue <- param
 	return nil
-}
-
-func (self *TxHandleTask) StartSendTxTask(mana interfaces.WithdrawManager) {
-	defer func() {
-		log.Info("exit StartSendTxTask gorountine")
-		close(self.verifyTxQueue)
-	}()
-
-	for param := range self.sendTxQueue {
-		verifyP := make([]verifyParam, len(param))
-		for i := 0; i < len(param); i++ {
-			if param[i].txHash == "" {
-				continue
-			}
-			txHash, err := mana.SendTx(param[i].txHex)
-			if err != nil {
-				log.Errorf("[StartTransfer] SendTx error: %s", err)
-				return
-			}
-			verifyP[i].TxHash = txHash
-		}
-		self.verifyTxQueue <- verifyP
-	}
-
 }
 
 func (self *TxHandleTask) WaitClose() {
@@ -189,46 +157,44 @@ func (self *TxHandleTask) WaitClose() {
 }
 
 func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
-	for param := range self.verifyTxQueue {
-		for _, verifyP := range param {
-			var boo bool
-			var err error
-			boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
-			if err != nil || !boo {
-				if verifyP.needSend {
-					_, err = mana.SendTx(verifyP.TxHex)
-					if err != nil {
-						log.Errorf("[StartVerifyTxTask] send tx failed: %s", err)
-					}
-					boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
-					if err != nil {
-						log.Errorf("[StartVerifyTxTask] VerifyTx failed: %s", err)
-						continue
-					}
-				}
-			}
-			if !boo {
-				//save failed tx to bonus_db
-				err := self.db.UpdateTxResultByTxHash(verifyP.TxHash, common.TxFailed, 0, err.Error())
+	for verifyP := range self.verifyTxQueue {
+		var boo bool
+		var err error
+		boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
+		if err != nil || !boo {
+			if verifyP.needSend {
+				_, err = mana.SendTx(verifyP.TxHex)
 				if err != nil {
-					log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyP.TxHash)
+					log.Errorf("[StartVerifyTxTask] send tx failed: %s", err)
 				}
-				log.Errorf("VerifyTx failed, txhash: %s, error: %s", verifyP.TxHash, err)
-				continue
+				boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
+				if err != nil {
+					log.Errorf("[StartVerifyTxTask] VerifyTx failed: %s", err)
+					continue
+				}
 			}
-			ti, err := mana.GetTxTime(verifyP.TxHash)
-			if err != nil {
-				log.Errorf("GetTxTime error: %s", err)
-				continue
-			}
-			//update bonus_db
-			err = self.db.UpdateTxResultByTxHash(verifyP.TxHash, common.TxSuccess, ti, "success")
+		}
+		if !boo {
+			//save failed tx to bonus_db
+			err := self.db.UpdateTxResultByTxHash(verifyP.TxHash, common.TxFailed, 0, err.Error())
 			if err != nil {
 				log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyP.TxHash)
-				continue
 			}
-			log.Debugf("verify tx success, txhash: %s", verifyP.TxHash)
+			log.Errorf("VerifyTx failed, txhash: %s, error: %s", verifyP.TxHash, err)
+			continue
 		}
+		ti, err := mana.GetTxTime(verifyP.TxHash)
+		if err != nil {
+			log.Errorf("GetTxTime error: %s", err)
+			continue
+		}
+		//update bonus_db
+		err = self.db.UpdateTxResultByTxHash(verifyP.TxHash, common.TxSuccess, ti, "success")
+		if err != nil {
+			log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyP.TxHash)
+			continue
+		}
+		log.Debugf("verify tx success, txhash: %s", verifyP.TxHash)
 	}
 	log.Info("exit StartVerifyTxTask gorountine")
 }

@@ -5,7 +5,7 @@
     "rpc_addr_test_net":"http://polaris2.ont.io:20336",
     "rpc_addr_main_net":"http://dappnode1.ont.io:20336",
     "gas_price":2500,
-    "gas_limit":2000000
+    "gas_limit":20000
   },
   "eth_cfg":{
     "gas_price":20,

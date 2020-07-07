@@ -453,8 +453,10 @@ func (self *OntManager) GetAdminBalance() (map[string]string, error) {
 }
 
 func (self *OntManager) EstimateFee(tokenType string, total int) (string, error) {
+	gasPrice := big.NewInt(int64(self.cfg.GasPrice))
+	gasLimit := big.NewInt(int64(self.cfg.GasLimit))
+	onePrice := new(big.Int).Mul(gasPrice, gasLimit)
 	tot := new(big.Int).SetUint64(uint64(total))
-	onePrice := new(big.Int).SetUint64(uint64(50000000))
 	fee := new(big.Int).Mul(tot, onePrice)
 	return utils.ToStringByPrecise(fee, config.ONG_DECIMALS), nil
 }

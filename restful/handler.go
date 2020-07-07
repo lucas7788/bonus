@@ -165,13 +165,12 @@ func Withdraw(ctx *routing.Context) error {
 	if mgr.GetStatus() == common.Transfering {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
-	err := mgr.WithdrawToken(withdrawParam.Address, strings.ToUpper(withdrawParam.TokenType))
-	if err != nil {
-		log.Errorf("WithdrawToken failed, error: %s", err)
-		res := ResponsePack(WithdrawTokenFailed)
-		res["Result"] = err
-		return writeResponse(ctx, res)
-	}
+	go func() {
+		err := mgr.WithdrawToken(withdrawParam.Address, strings.ToUpper(withdrawParam.TokenType))
+		if err != nil {
+			log.Errorf("WithdrawToken failed, error: %s", err)
+		}
+	}()
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
@@ -290,7 +289,7 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 			log.Errorf("EstimateFee error: %s", err)
 			return writeResponse(ctx, ResponsePack(EstimateFeeError))
 		}
-		if balance[config.ETH] > "0.005" && balance[config.ERC20] > "1" {
+		if balance[config.ETH] >= "0.0008" && balance[config.ERC20] >= "0.1" {
 			fee, err = mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
 			if err != nil {
 				log.Errorf("EstimateFee error: %s", err)
@@ -336,7 +335,7 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 	}
 	log.Info("AdminBalance", excelParam.AdminBalance[excelParam.TokenType])
 	if excelParam.TokenType == config.ERC20 {
-		if excelParam.AdminBalance[excelParam.TokenType] > "1" && excelParam.AdminBalance[config.ETH] > "0.005" {
+		if excelParam.AdminBalance[excelParam.TokenType] >= "0.1" && excelParam.AdminBalance[config.ETH] >= "0.0008" {
 			excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
 			if err != nil {
 				log.Errorf("EstimateFee error: %s", err)

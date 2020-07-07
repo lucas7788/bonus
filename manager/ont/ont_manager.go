@@ -261,7 +261,10 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 	}
 
 	// check fee
-	fee := new(big.Int).SetUint64(uint64(10000000)) // 0.01
+	gasPrice := big.NewInt(int64(self.cfg.GasPrice))
+	gasLimit := big.NewInt(int64(self.cfg.GasLimit))
+
+	fee := new(big.Int).Mul(gasPrice, gasLimit) // 0.05
 	ongBalance := utils.ToIntByPrecise(bal[config.ONG], config.ONG_DECIMALS)
 	if ongBalance.Cmp(fee) < 0 {
 		return fmt.Errorf("ong balance is not enough for fee")

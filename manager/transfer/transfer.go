@@ -63,6 +63,9 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 	}
 	newTxHexMap := make(map[string][]byte)
 	limit := 200
+	if excel.TokenType == config.ETH || excel.TokenType == config.ERC20 {
+		limit=5
+	}
 	txInfoArr := make([]common.TransactionInfo, limit)
 	txInfoArrIndex := 0
 	index := 0
@@ -117,6 +120,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		case <-self.stopChan:
 			log.Infof("[StartTransfer] stopChan, address: %s", addr)
 			self.TransferStatus = common.Stop
+			close(self.verifyTxQueue)
 			return nil
 		default:
 			continue

@@ -276,10 +276,10 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	// TODO: FIX HERE
 	var amount *big.Int
 	if tokenType == config.ETH {
-		amountStr := "0.005"
+		amountStr := "0.0008"
 		amount = utils.ToIntByPrecise(amountStr, config.ETH_DECIMALS)
 	} else if tokenType == config.ERC20 {
-		amountStr := "1"
+		amountStr := "0.1"
 		amount = utils.ToIntByPrecise(amountStr, self.tokens[self.excel.ContractAddress].Decimals)
 	}
 	gaslimit, err := self.estimateGasLimit(tokenType, contractAddr, adminAddress, amount, self.gasPrice)
@@ -325,7 +325,6 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 			return err
 		}
 		fee := utils.ToIntByPrecise(feeStr, config.ETH_DECIMALS)
-
 		ethBalance := allBalances[config.ETH]
 		ethBa := utils.ToIntByPrecise(ethBalance, config.ETH_DECIMALS)
 		if ethBa.Cmp(fee) <= 0 {
@@ -494,7 +493,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
 		}
-		return gasLimit * 2, nil
+		return gasLimit, nil
 	} else if tokenType == config.ERC20 {
 		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 		if err != nil {
@@ -509,7 +508,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
-		return gasLimit * 2, nil
+		return gasLimit, nil
 	} else {
 		return 0, fmt.Errorf("unknown token type: %s", tokenType)
 	}

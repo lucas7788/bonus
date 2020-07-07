@@ -631,7 +631,6 @@ func (this *EthManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 		_, isPending, err := this.ethClient.TransactionByHash(context.Background(), hash)
 		if err == ethereum.NotFound {
 			log.Errorf("[VerifyTx] TransactionByHash error: %s, txHash:%s", err, txHash)
-			return false, ethereum.NotFound
 		}
 		if err != nil {
 			if retry >= retryLimit {

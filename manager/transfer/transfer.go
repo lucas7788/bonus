@@ -116,6 +116,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		select {
 		case <-self.stopChan:
 			log.Infof("[StartTransfer] stopChan, address: %s", addr)
+			self.TransferStatus = common.Stop
 			return nil
 		default:
 			continue
@@ -126,6 +127,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		log.Infof("[StartTransfer] for end insertAndSendTx, error: %s", err)
 		return err
 	}
+	close(self.verifyTxQueue)
 	return nil
 }
 
@@ -196,4 +198,5 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 		log.Debugf("verify tx success, txhash: %s", verifyP.TxHash)
 	}
 	log.Info("exit StartVerifyTxTask gorountine")
+	self.TransferStatus = common.Transfered
 }

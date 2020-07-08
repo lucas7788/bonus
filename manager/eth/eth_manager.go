@@ -360,7 +360,11 @@ func (self *EthManager) WithdrawToken(address, tokenType string) error {
 		return fmt.Errorf("[WithdrawToken] fetch nonce failed, %s", err)
 	}
 	self.nonce = nonce
-	amount := utils.ToIntByPrecise(amt, self.decimals)
+	decimal := self.decimals
+	if tokenType == config.ETH {
+		decimal = config.ETH_DECIMALS
+	}
+	amount := utils.ToIntByPrecise(amt, decimal)
 	hash, txHex, err := self.NewWithdrawTx(address, amount, tokenType)
 	if hash == "" || txHex == nil || err != nil {
 		return fmt.Errorf("[WithdrawToken] NewWithdrawTx failed, error: %s", err)

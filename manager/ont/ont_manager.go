@@ -39,6 +39,7 @@ type OntManager struct {
 	txHandleTask    *transfer.TxHandleTask
 	stopChan        chan bool
 	collectData     map[string]*big.Int
+	withdrawStatus  int
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
@@ -254,7 +255,15 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
+func (self *OntManager) GetWithdrawStatus() int {
+	return self.withdrawStatus
+}
+
 func (self *OntManager) WithdrawToken(address string, tokenType string) error {
+	self.withdrawStatus = 1
+	defer func() {
+		self.withdrawStatus = 0
+	}()
 	bal, err := self.GetAdminBalance()
 	if err != nil {
 		return fmt.Errorf("GetAdminBalance faied, error: %s", err)

@@ -18,6 +18,7 @@ type WithdrawManager interface {
 	WithdrawToken(address string, tokenType string) error
 	ComputeSum() (string, error)
 	GetStatus() common.TransferStatus
+	GetWithdrawStatus() int
 	VerifyAddress(address string) bool
 	GetNetType() string
 	GetTotal() int

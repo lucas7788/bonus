@@ -49,18 +49,19 @@ type EthManager struct {
 	netType string
 	db      *bonus_db.BonusDB
 
-	keyStore     *keystore.KeyStore
-	account      accounts.Account
-	ethClient    *ethclient.Client
-	txTimeClient *rpc.Client
-	tokens       map[string]*Token
-	Erc20Abi     abi.ABI
-	nonce        uint64
-	txHandleTask *transfer.TxHandleTask
-	stopChan     chan bool
-	collectData  map[string]*big.Int
-	decimals     uint64
-	gasPrice     *big.Int
+	keyStore       *keystore.KeyStore
+	account        accounts.Account
+	ethClient      *ethclient.Client
+	txTimeClient   *rpc.Client
+	tokens         map[string]*Token
+	Erc20Abi       abi.ABI
+	nonce          uint64
+	txHandleTask   *transfer.TxHandleTask
+	stopChan       chan bool
+	collectData    map[string]*big.Int
+	decimals       uint64
+	gasPrice       *big.Int
+	withdrawStatus int
 }
 
 func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*EthManager, error) {
@@ -308,8 +309,14 @@ func (self *EthManager) ComputeSum() (string, error) {
 	}
 	return "", fmt.Errorf("[ComputeSum]not supported token type: %s", self.excel.TokenType)
 }
-
+func (self *EthManager) GetWithdrawStatus() int {
+	return self.withdrawStatus
+}
 func (self *EthManager) WithdrawToken(address, tokenType string) error {
+	self.withdrawStatus = 1
+	defer func() {
+		self.withdrawStatus = 0
+	}()
 	allBalances, err := self.GetAdminBalance()
 	if err != nil {
 		return err

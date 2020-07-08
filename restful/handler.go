@@ -162,7 +162,7 @@ func Withdraw(ctx *routing.Context) error {
 		return writeResponse(ctx, ResponsePack(AddressIsWrong))
 	}
 
-	if mgr.GetStatus() == common.Transfering {
+	if mgr.GetStatus() == common.Transfering || mgr.GetWithdrawStatus() == 1 {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
 	go func() {

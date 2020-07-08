@@ -21,10 +21,10 @@ const (
 )
 
 const (
-	RetryLimit    = 30
-	SleepTime     = 3
-	EthSleepTime  = 6
-	PendingLimit  = 100
+	RetryLimit   = 30
+	SleepTime    = 3
+	EthSleepTime = 6
+	PendingLimit = 100
 )
 
 var (

@@ -289,6 +289,9 @@ func (self *EthManager) EstimateFee(tokenType string, total int) (string, error)
 	}
 	gasLimi := new(big.Int).SetUint64(gaslimit)
 	gas := new(big.Int).Mul(gasLimi, self.gasPrice)
+	if total > 1 {
+		total = total * 2
+	}
 	gasTotal := new(big.Int).Mul(gas, new(big.Int).SetUint64(uint64(total)))
 	return utils.ToStringByPrecise(gasTotal, config.ETH_DECIMALS), nil
 }
@@ -504,7 +507,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawEthTx: pre-execute failed, err: %s", err)
 		}
-		return gasLimit*2, nil
+		return gasLimit, nil
 	} else if tokenType == config.ERC20 {
 		txData, err := this.Erc20Abi.Pack("transfer", to, amount)
 		if err != nil {
@@ -519,7 +522,7 @@ func (this *EthManager) estimateGasLimit(tokenType string, contractAddr, to ethC
 		if err != nil {
 			return 0, fmt.Errorf("newWithdrawErc20Tx: pre-execute failed, err: %s", err)
 		}
-		return gasLimit*2, nil
+		return gasLimit, nil
 	} else {
 		return 0, fmt.Errorf("unknown token type: %s", tokenType)
 	}

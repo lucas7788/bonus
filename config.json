@@ -10,12 +10,6 @@
   "eth_cfg":{
     "gas_price":20,
     "rpc_addr_test_net": "http://18.140.187.37:10331",
-    "rpc_addr_main_net": "http://onto-eth.ont.io:10331",
-    "tokens": [
-      {
-        "token_name": "ZIL",
-        "contract_addr": "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"
-      }
-    ]
+    "rpc_addr_main_net": "http://onto-eth.ont.io:10331"
   }
 }

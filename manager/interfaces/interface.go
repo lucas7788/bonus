@@ -3,14 +3,14 @@ package interfaces
 import (
 	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
+	"math/big"
 )
 
 type WithdrawManager interface {
-	NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error)
+	NewWithdrawTx(destAddr string, amount *big.Int, tokenType string) (string, []byte, error)
 	SendTx(txHex []byte) (string, error)
 	VerifyTx(txHash string, retryLimit int) (bool, error)
 	StartTransfer()
-	StartHandleTxTask()
 	GetAdminAddress() string
 	EstimateFee(tokenType string, total int) (string, error)
 	GetTxTime(txHash string) (uint32, error)
@@ -18,6 +18,7 @@ type WithdrawManager interface {
 	WithdrawToken(address string, tokenType string) error
 	ComputeSum() (string, error)
 	GetStatus() common.TransferStatus
+	GetWithdrawStatus() int
 	VerifyAddress(address string) bool
 	GetNetType() string
 	GetTotal() int

@@ -50,7 +50,7 @@ var ErrMap = map[int64]string{
 	EventTypeNameError:          "EventTypeNameError",
 	ShouldBeTransfering:         "only the status is transfering can be terminated",
 	StopError:                   "Stop",
-	NewDBError:"NewDBError",
+	NewDBError:                  "NewDBError",
 }
 
 const (
@@ -83,5 +83,5 @@ const (
 	EventTypeNameError          = 40025
 	ShouldBeTransfering         = 40026
 	StopError                   = 40027
-	NewDBError = 40028
+	NewDBError                  = 40028
 )

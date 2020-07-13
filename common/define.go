@@ -74,3 +74,10 @@ type WithdrawParam struct {
 	TokenType string
 	NetType   string
 }
+
+type TxCache struct {
+	Addr     string
+	TxHash   string
+	TxHex    string
+	TxStatus TxResult
+}

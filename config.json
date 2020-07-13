@@ -1,20 +1,15 @@
 {
-  "rest_port":8080,
+  "rest_port":20327,
   "version":"1.0.0",
   "ont_cfg": {
-    "rpc_addr_test_net":"http://polaris1.ont.io:20336",
+    "rpc_addr_test_net":"http://polaris2.ont.io:20336",
     "rpc_addr_main_net":"http://dappnode1.ont.io:20336",
-    "gas_price":500,
-    "gas_limit":2000000
+    "gas_price":2500,
+    "gas_limit":20000
   },
   "eth_cfg":{
-    "rpc_addr_test_net": "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-    "rpc_addr_main_net": "http://onto-eth.ont.io:10331",
-    "tokens": [
-      {
-        "token_name": "ZIL",
-        "contract_addr": "0x247f83Ade8379A5bf4c98c18D68E64Cdf08E7CD9"
-      }
-    ]
+    "gas_price":20,
+    "rpc_addr_test_net": "http://18.140.187.37:10331",
+    "rpc_addr_main_net": "http://onto-eth.ont.io:10331"
   }
 }

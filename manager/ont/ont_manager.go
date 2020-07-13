@@ -38,6 +38,8 @@ type OntManager struct {
 	decimals        int
 	txHandleTask    *transfer.TxHandleTask
 	stopChan        chan bool
+	collectData     map[string]*big.Int
+	withdrawStatus  int
 }
 
 func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*OntManager, error) {
@@ -90,6 +92,12 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 		return nil, err
 	}
 	log.Infof("ont admin address: %s", acct.Address.ToBase58())
+	decimal := 0
+	if eatp.TokenType == config.ONT {
+		decimal = 0
+	} else if eatp.TokenType == config.ONG {
+		decimal = 9
+	}
 	mgr := &OntManager{
 		cfg:      cfg,
 		excel:    eatp,
@@ -97,6 +105,7 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 		account:  acct,
 		ontSdk:   ontSdk,
 		stopChan: make(chan bool),
+		decimals: decimal,
 	}
 
 	if mgr.excel.ContractAddress != "" {
@@ -104,7 +113,25 @@ func NewOntManager(cfg *config.Ont, eatp *common2.ExcelParam, netType string) (*
 			return nil, fmt.Errorf("update contract info: %s", err)
 		}
 	}
+	mgr.initCollectData()
+	log.Infof("NewOntManager success, gasPrice: %d, decimals:%d, netTy:%s",
+		cfg.GasPrice, mgr.decimals, mgr.netType)
 	return mgr, nil
+}
+
+func (this *OntManager) initCollectData() {
+	collectData := make(map[string]*big.Int)
+	var trAmt *big.Int
+	for _, trParam := range this.excel.BillList {
+		trAmt = utils.ToIntByPrecise(trParam.Amount, uint64(this.decimals))
+		amt, ok := collectData[trParam.Address]
+		if !ok {
+			collectData[trParam.Address] = trAmt
+		} else {
+			collectData[trParam.Address] = new(big.Int).Add(amt, trAmt)
+		}
+	}
+	this.collectData = collectData
 }
 
 func (this *OntManager) SetDB(db *bonus_db.BonusDB) {
@@ -198,41 +225,15 @@ func (self *OntManager) VerifyAddress(address string) bool {
 }
 
 func (self *OntManager) StartTransfer() {
-	self.StartHandleTxTask()
+	self.txHandleTask = transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE, self.stopChan)
+	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
+	go self.txHandleTask.StartVerifyTxTask(self)
 	go func() {
-		hasBuildTxId, err := self.txHandleTask.UpdateTxInfoTable(self, self.excel)
+		err := self.txHandleTask.StartTxTask(self, self.excel, self.collectData, uint64(self.decimals))
 		if err != nil {
-			log.Errorf("[UpdateTxInfoTable] error: %s", err)
-			close(self.txHandleTask.TransferQueue)
-			self.txHandleTask.WaitClose()
+			log.Errorf("[StartTransfer] error: %s", err)
 			return
 		}
-	loop:
-		for _, trParam := range self.excel.BillList {
-			if trParam.Amount == "0" {
-				continue
-			}
-			if !hasBuildTxId[trParam.Id] {
-				if err := self.hasEnoughBalance(trParam.Amount, self.excel.TokenType); err != nil {
-					log.Errorf("[StartTransfer] hasEnoughBalance error: %s", err)
-					break loop
-				}
-			}
-			select {
-			case self.txHandleTask.TransferQueue <- trParam:
-				log.Infof("[StartTransfer]TransferQueue id: %d", trParam.Id)
-			case <-self.txHandleTask.CloseChan:
-				log.Infof("[StartTransfer] CloseChan, id: %d", trParam.Id)
-				break loop
-			case <-self.stopChan:
-				log.Infof("[StartTransfer] StopChan, id: %d", trParam.Id)
-				self.txHandleTask.StopTransferChan <- true
-				return
-			}
-		}
-		// FIXME: remove the close if tx-timeout not handled
-		close(self.txHandleTask.TransferQueue)
-		self.txHandleTask.WaitClose()
 	}()
 }
 
@@ -254,22 +255,25 @@ func (self *OntManager) GetStatus() common2.TransferStatus {
 	return self.txHandleTask.TransferStatus
 }
 
-func (self *OntManager) StartHandleTxTask() {
-	txHandleTask := transfer.NewTxHandleTask(self.excel.TokenType, self.db, config.ONT_TRANSFER_QUEUE_SIZE)
-	self.txHandleTask = txHandleTask
-	log.Infof("init txHandleTask success, transfer status: %d\n", self.txHandleTask.TransferStatus)
-	go self.txHandleTask.StartHandleTransferTask(self, self.excel.EventType)
-	go self.txHandleTask.StartVerifyTxTask(self)
+func (self *OntManager) GetWithdrawStatus() int {
+	return self.withdrawStatus
 }
 
 func (self *OntManager) WithdrawToken(address string, tokenType string) error {
+	self.withdrawStatus = 1
+	defer func() {
+		self.withdrawStatus = 0
+	}()
 	bal, err := self.GetAdminBalance()
 	if err != nil {
 		return fmt.Errorf("GetAdminBalance faied, error: %s", err)
 	}
 
 	// check fee
-	fee := new(big.Int).SetUint64(uint64(10000000)) // 0.01
+	gasPrice := big.NewInt(int64(self.cfg.GasPrice))
+	gasLimit := big.NewInt(int64(self.cfg.GasLimit))
+
+	fee := new(big.Int).Mul(gasPrice, gasLimit) // 0.05
 	ongBalance := utils.ToIntByPrecise(bal[config.ONG], config.ONG_DECIMALS)
 	if ongBalance.Cmp(fee) < 0 {
 		return fmt.Errorf("ong balance is not enough for fee")
@@ -292,7 +296,8 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 
 func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
 	log.Infof("address:%s, amt:%s", address, amt)
-	_, txHex, err := self.NewWithdrawTx(address, amt, tokenType)
+	amount := utils.ToIntByPrecise(amt, uint64(self.decimals))
+	_, txHex, err := self.NewWithdrawTx(address, amount, tokenType)
 	if err != nil {
 		log.Errorf("NewWithdrawTx failed, error: %s", err)
 		return fmt.Errorf("NewWithdrawTx failed, error: %s", err)
@@ -374,82 +379,15 @@ func (self *OntManager) NewBatchWithdrawTx(addrAndAmts [][]string) (string, []by
 	return h.ToHexString(), t.ToArray(), nil
 }
 
-func (self *OntManager) hasEnoughBalance(amount string, tokenTy string) error {
-	//check fee
-	ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
-	if err != nil {
-		return fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
-	}
-	fee := utils.ToIntByPrecise("0.01", config.ONG_DECIMALS)
-	if ongBalance < fee.Uint64() {
-		return fmt.Errorf("[hasEnoughBalance] %s,fee adminbalance: %d, value: %f", config.InSufficientBalance, ongBalance, 0.01)
-	}
-	if tokenTy == config.ONT {
-		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
-		adminbalance, err := self.ontSdk.Native.Ont.BalanceOf(self.account.Address)
-		if err != nil {
-			return fmt.Errorf("[NewWithdrawTx] BalanceOf failed: %s", err)
-		}
-		if adminbalance < value {
-			return fmt.Errorf("%s, ont adminbalance: %d, value: %d", config.InSufficientBalance, adminbalance, value)
-		}
-		return nil
-	} else if tokenTy == config.ONG {
-		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
-		ongBalance, err := self.ontSdk.Native.Ong.BalanceOf(self.account.Address)
-		if err != nil {
-			return fmt.Errorf("[NewWithdrawTx] ong BalanceOf failed:%s", err)
-		}
-
-		if ongBalance < value {
-			return fmt.Errorf("%s, adminbalance: %d, value: %d", config.InSufficientBalance, ongBalance, value)
-		}
-		return nil
-	} else if tokenTy == config.OEP4 {
-		val := utils.ParseAssetAmount(amount, self.decimals)
-		value := new(big.Int).SetUint64(val)
-		res, err := self.ontSdk.NeoVM.PreExecInvokeNeoVMContract(self.contractAddress, []interface{}{"balanceOf", []interface{}{self.account.Address}})
-		if err != nil {
-			return fmt.Errorf("[NewWithdrawTx] oep4 BalanceOf failed:%s", err)
-		}
-		oep4Balance, err := res.Result.ToInteger()
-		if err != nil {
-			return err
-		}
-		ba := utils.ToStringByPrecise(oep4Balance, uint64(self.decimals))
-		if oep4Balance.Cmp(value) < 0 {
-			return fmt.Errorf("%s, oep4 adminbalance: %s, value: %s", config.InSufficientBalance, ba, amount)
-		}
-		return nil
-	}
-	return fmt.Errorf("not supprt tokentype: %s", tokenTy)
-}
-
-func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (string, []byte, error) {
+func (self *OntManager) NewWithdrawTx(destAddr string, amount *big.Int, tokenType string) (string, []byte, error) {
 	address, err := common.AddressFromBase58(destAddr)
 	if err != nil {
 		return "", nil, fmt.Errorf("common.AddressFromBase58 error: %s", err)
 	}
 	var tx *types.MutableTransaction
 	if (self.excel.TokenType == config.ONT && tokenType == "") || tokenType == config.ONT {
-		if err := self.hasEnoughBalance(amount, config.ONT); err != nil {
-			return "", nil, err
-		}
-		value := utils.ParseAssetAmount(amount, config.ONT_DECIMALS)
-		if err = self.hasEnoughBalance(amount, config.ONT); err != nil {
-			return "", nil, err
-		}
-		var sts []ont.State
-		sts = append(sts, ont.State{
-			From:  self.account.Address,
-			To:    address,
-			Value: value,
-		})
-		params := ont.Transfers{
-			States: sts,
-		}
-		tx, err = self.ontSdk.Native.NewNativeInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit,
-			OntIDVersion, sdk.ONT_CONTRACT_ADDRESS, "transfer", []interface{}{params})
+		tx, err = self.ontSdk.Native.Ont.NewTransferTransaction(self.cfg.GasPrice,
+			self.cfg.GasLimit, self.account.Address, address, amount.Uint64())
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ont, this.ontologySdk.Native.NewNativeInvokeTransaction error: %s", err)
 		}
@@ -458,24 +396,8 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ont: this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.ONG && tokenType == "") || tokenType == config.ONG {
-		if err := self.hasEnoughBalance(amount, config.ONG); err != nil {
-			return "", nil, err
-		}
-		value := utils.ParseAssetAmount(amount, config.ONG_DECIMALS)
-		if err = self.hasEnoughBalance(amount, config.ONG); err != nil {
-			return "", nil, err
-		}
-		var sts []ont.State
-		sts = append(sts, ont.State{
-			From:  self.account.Address,
-			To:    address,
-			Value: value,
-		})
-		params := ont.Transfers{
-			States: sts,
-		}
-		tx, err = self.ontSdk.Native.NewNativeInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit,
-			OntIDVersion, sdk.ONG_CONTRACT_ADDRESS, "transfer", []interface{}{params})
+		tx, err = self.ontSdk.Native.Ong.NewTransferTransaction(self.cfg.GasPrice,
+			self.cfg.GasLimit, self.account.Address, address, amount.Uint64())
 		if err != nil {
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.Native.NewNativeInvokeTransaction error: %s", err)
 		}
@@ -484,19 +406,10 @@ func (self *OntManager) NewWithdrawTx(destAddr, amount, tokenType string) (strin
 			return "", nil, fmt.Errorf("transfer ong, this.ontologySdk.SignToTransaction err: %s", err)
 		}
 	} else if (self.excel.TokenType == config.OEP4 && tokenType == "") || tokenType == config.OEP4 {
-		if err := self.hasEnoughBalance(amount, config.OEP4); err != nil {
-			return "", nil, err
-		}
 		if self.contractAddress == common.ADDRESS_EMPTY {
 			return "", nil, fmt.Errorf("contractAddress is nil")
 		}
-		val := utils.ParseAssetAmount(amount, self.decimals)
-		value := new(big.Int).SetUint64(val)
-		if err = self.hasEnoughBalance(amount, config.OEP4); err != nil {
-			return "", nil, err
-		}
-
-		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, value}})
+		tx, err = self.ontSdk.NeoVM.NewNeoVMInvokeTransaction(self.cfg.GasPrice, self.cfg.GasLimit, self.contractAddress, []interface{}{"transfer", []interface{}{self.account.Address, address, amount}})
 		if err != nil {
 			return "", nil, fmt.Errorf("NewNeoVMInvokeTransaction error: %s", err)
 		}
@@ -552,12 +465,16 @@ func (self *OntManager) GetAdminBalance() (map[string]string, error) {
 }
 
 func (self *OntManager) EstimateFee(tokenType string, total int) (string, error) {
-	fee := float64(total) * 0.01
-	return strconv.FormatFloat(fee, 'f', -1, 64), nil
+	gasPrice := big.NewInt(int64(self.cfg.GasPrice))
+	gasLimit := big.NewInt(int64(self.cfg.GasLimit))
+	onePrice := new(big.Int).Mul(gasPrice, gasLimit)
+	tot := new(big.Int).SetUint64(uint64(total))
+	fee := new(big.Int).Mul(tot, onePrice)
+	return utils.ToStringByPrecise(fee, config.ONG_DECIMALS), nil
 }
 
 func (self *OntManager) GetTotal() int {
-	return len(self.excel.BillList)
+	return len(self.collectData)
 }
 
 func (self *OntManager) ComputeSum() (string, error) {

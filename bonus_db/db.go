@@ -43,7 +43,7 @@ func NewBonusDB(tokenTy, evtTy, netTy string) (*BonusDB, error) {
 	}
 	log.Info("[NewBonusDB] existed:", existed)
 	if !existed {
-		createTxInfoTableSqlTest := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
+		createTxInfoTableSqlTest := `CREATE TABLE IF NOT EXISTS "bonus_transaction_info"("Id" INTEGER PRIMARY KEY NOT NULL, "NetType" varchar(20) not null, "TokenType" varchar(20) not null, "EventType" varchar(100) not null, "ContractAddress" varchar(100) not null, "Address" varchar(100) unique not null, "Amount" varchar(100) not null, "TxHash" varchar(100) not null DEFAULT "", "TxTime" bigint(20) NOT NULL DEFAULT 0, "TxHex" varchar(5000) not null default "", "ErrorDetail" varchar(1000) not null default "", "TxResult" tinyint(1) NOT NULL DEFAULT 0)`
 		_, err = db.Exec(createTxInfoTableSqlTest, nil)
 		if err != nil {
 			return nil, err
@@ -58,17 +58,20 @@ func (this *BonusDB) Close() {
 	this.db.Close()
 }
 
-func (this *BonusDB) InsertTxInfoSql(args []*common.TransactionInfo) error {
+func (this *BonusDB) InsertTxInfoSql(args []common.TransactionInfo) error {
 	sqlStrArr := make([]string, 0)
 	for _, txInfo := range args {
-		oneData := fmt.Sprintf("('%d','%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.Id, txInfo.NetType, txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex, txInfo.TxResult, txInfo.ErrorDetail)
+		if txInfo.TxHash == "" {
+			continue
+		}
+		oneData := fmt.Sprintf("('%s','%s','%s','%s','%s','%s','%s','%s','%d','%s')", txInfo.NetType, txInfo.EventType, txInfo.TokenType, txInfo.ContractAddress, txInfo.Address, txInfo.Amount, txInfo.TxHash, txInfo.TxHex, txInfo.TxResult, txInfo.ErrorDetail)
 		sqlStrArr = append(sqlStrArr, oneData)
 	}
 	if len(sqlStrArr) == 0 {
-		return fmt.Errorf("database has the same data")
+		return nil
 	}
 	content := strings.Join(sqlStrArr, ",")
-	strSql := "insert into bonus_transaction_info (Id,NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
+	strSql := "insert into bonus_transaction_info (NetType,EventType,TokenType,ContractAddress, Address, Amount,TxHash,TxHex,TxResult,ErrorDetail) values"
 	_, err := this.db.Exec(strSql + content)
 	if err != nil {
 		return err
@@ -86,6 +89,19 @@ func (this *BonusDB) UpdateTxInfo(txHash, TxHex string, txResult common.TxResult
 		return err
 	}
 	_, err = stmt.Exec(txHash, TxHex, txResult, eventType, address, id)
+	return err
+}
+
+func (this *BonusDB) UpdateTxResultByTxHash(txHash string, txResult common.TxResult, txTime uint32, errDetail string) error {
+	strSql := "update bonus_transaction_info set TxResult=?, TxTime=?, ErrorDetail= ? where TxHash=?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(txResult, txTime, errDetail, txHash)
 	return err
 }
 
@@ -140,9 +156,9 @@ func (this *BonusDB) QueryTransferProgress(eventType, netType string) (map[strin
 func (this *BonusDB) getSum(eventType, netType string, txResult common.TxResult) (int, error) {
 	var strSql string
 	if txResult == common.AllStatus {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and NetType=?"
 	} else {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and NetType=? and TxResult=?"
 	}
 
 	stmt, err := this.db.Prepare(strSql)
@@ -204,6 +220,91 @@ func (this *BonusDB) QueryTxHexByTxHash(txHash string) (*common.TransactionInfo,
 		}, nil
 	}
 	return nil, nil
+}
+
+func (this *BonusDB) QueryTxInfo() (map[string]*common.TxCache, error) {
+	strSql := "select Address,TxHash,TxHex,TxResult from bonus_transaction_info"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query()
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	txCaches := make(map[string]*common.TxCache)
+	for rows.Next() {
+		var txHash, txHex, addr string
+		var txResult common.TxResult
+		if err = rows.Scan(&addr, &txHash, &txHex, &txResult); err != nil {
+			return nil, err
+		}
+		txCaches[addr] = &common.TxCache{
+			Addr:     addr,
+			TxHash:   txHash,
+			TxHex:    txHex,
+			TxStatus: txResult,
+		}
+	}
+	return txCaches, nil
+}
+
+func (this *BonusDB) QueryTxResult(addr string) (common.TxResult, error) {
+	strSql := "select TxResult from bonus_transaction_info where Address=?"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return common.NotBuild, err
+	}
+	rows, err := stmt.Query(addr)
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return common.NotBuild, err
+	}
+	for rows.Next() {
+		var txResult common.TxResult
+		if err = rows.Scan(&txResult); err != nil {
+			return common.NotBuild, err
+		}
+		return txResult, nil
+	}
+	return common.NotBuild, nil
+}
+
+func (this *BonusDB) QueryTxInfoNum() (int, error) {
+	strSql := "select count(*) from bonus_transaction_info"
+	stmt, err := this.db.Prepare(strSql)
+	if stmt != nil {
+		defer stmt.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	rows, err := stmt.Query()
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	for rows.Next() {
+		var txInfoNum int
+		if err = rows.Scan(&txInfoNum); err != nil {
+			return 0, err
+		}
+		return txInfoNum, nil
+	}
+	return 0, nil
 }
 
 func (this *BonusDB) QueryTxHexByExcelAndAddr(eventType, address string, id int) (*common.TransactionInfo, error) {
@@ -312,9 +413,9 @@ func (this *BonusDB) QueryTxInfoByEventType(eventType string, start, pageSize in
 func (this *BonusDB) getTxInfoTotal(eventType string, txResult common.TxResult) (int, error) {
 	var strSql string
 	if txResult == common.AllStatus {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=?"
 	} else {
-		strSql = "select count(Id) from bonus_transaction_info where EventType=? and TxResult=?"
+		strSql = "select count(*) from bonus_transaction_info where EventType=? and TxResult=?"
 	}
 
 	stmt, err := this.db.Prepare(strSql)

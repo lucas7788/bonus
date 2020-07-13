@@ -6,13 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ontio/bonus/bonus_db"
 	"github.com/ontio/bonus/common"
 	"github.com/ontio/bonus/config"
 	"github.com/ontio/bonus/manager"
 	"github.com/ontio/bonus/manager/interfaces"
 	"github.com/ontio/ontology/common/log"
 	"github.com/qiangxue/fasthttp-routing"
-	"github.com/ontio/bonus/bonus_db"
 )
 
 var DefBonusMap = new(sync.Map) // evttype + nettype -> withdraw-mgr
@@ -162,16 +162,15 @@ func Withdraw(ctx *routing.Context) error {
 		return writeResponse(ctx, ResponsePack(AddressIsWrong))
 	}
 
-	if mgr.GetStatus() == common.Transfering {
+	if mgr.GetStatus() == common.Transfering || mgr.GetWithdrawStatus() == 1 {
 		return writeResponse(ctx, ResponsePack(Transfering))
 	}
-	err := mgr.WithdrawToken(withdrawParam.Address, strings.ToUpper(withdrawParam.TokenType))
-	if err != nil {
-		log.Errorf("WithdrawToken failed, error: %s", err)
-		res := ResponsePack(WithdrawTokenFailed)
-		res["Result"] = err
-		return writeResponse(ctx, res)
-	}
+	go func() {
+		err := mgr.WithdrawToken(withdrawParam.Address, strings.ToUpper(withdrawParam.TokenType))
+		if err != nil {
+			log.Errorf("WithdrawToken failed, error: %s", err)
+		}
+	}()
 	return writeResponse(ctx, ResponsePack(SUCCESS))
 }
 
@@ -283,10 +282,26 @@ func GetTxInfoByEventType(ctx *routing.Context) error {
 		log.Errorf("GetAdminBalance error: %s", err)
 		return writeResponse(ctx, ResponsePack(GetAdminBalanceError))
 	}
-	fee, err := mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
-	if err != nil {
-		log.Errorf("EstimateFee error: %s", err)
-		return writeResponse(ctx, ResponsePack(EstimateFeeError))
+	var fee string
+	if mgr.GetExcelParam().TokenType == config.ERC20 || mgr.GetExcelParam().TokenType == config.ETH {
+		balance, err := mgr.GetAdminBalance()
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return writeResponse(ctx, ResponsePack(EstimateFeeError))
+		}
+		if balance[config.ETH] >= "0.0008" && balance[config.ERC20] >= "0.1" {
+			fee, err = mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
+			if err != nil {
+				log.Errorf("EstimateFee error: %s", err)
+				return writeResponse(ctx, ResponsePack(EstimateFeeError))
+			}
+		}
+	} else {
+		fee, err = mgr.EstimateFee(mgr.GetExcelParam().TokenType, mgr.GetTotal())
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return writeResponse(ctx, ResponsePack(EstimateFeeError))
+		}
 	}
 	res := &common.GetTxInfoByEvtType{
 		TxInfo:          txInfo,
@@ -318,10 +333,21 @@ func updateExcelParam(mgr interfaces.WithdrawManager, excelParam *common.ExcelPa
 		log.Errorf("GetAdminBalance error: %s", err)
 		return GetAdminBalanceError
 	}
-	excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
-	if err != nil {
-		log.Errorf("EstimateFee error: %s", err)
-		return EstimateFeeError
+	log.Info("AdminBalance", excelParam.AdminBalance[excelParam.TokenType])
+	if excelParam.TokenType == config.ERC20 {
+		if excelParam.AdminBalance[excelParam.TokenType] >= "0.1" && excelParam.AdminBalance[config.ETH] >= "0.0008" {
+			excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
+			if err != nil {
+				log.Errorf("EstimateFee error: %s", err)
+				return EstimateFeeError
+			}
+		}
+	} else {
+		excelParam.EstimateFee, err = mgr.EstimateFee(excelParam.TokenType, mgr.GetTotal())
+		if err != nil {
+			log.Errorf("EstimateFee error: %s", err)
+			return EstimateFeeError
+		}
 	}
 	excelParam.Admin = mgr.GetAdminAddress()
 	excelParam.Total = mgr.GetTotal()

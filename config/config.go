@@ -9,8 +9,8 @@ import (
 var Version = ""
 
 var (
-	EthOneGwei            = new(big.Int).SetUint64(uint64(1000000000))
-	ETH_DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", ETH_DECIMALS).Uint64() // 40 Gwei
+	EthOneGwei = new(big.Int).SetUint64(uint64(1000000000))
+	//ETH_DEFAULT_GAS_PRICE = utils.ToIntByPrecise("0.00000004", ETH_DECIMALS).Uint64() // 40 Gwei
 	ETH_MIN_ETH_BANALNCE  = utils.ToIntByPrecise("0.00001", ETH_DECIMALS).Uint64()
 	ONT_DEFAULT_GAS_LIMIT = 2000000
 )
@@ -22,13 +22,14 @@ var DefConfig = &Config{
 	OntCfg: &Ont{
 		OntJsonRpcAddressMainNet: "http://dappnode1.ont.io:20336",
 		OntJsonRpcAddressTestNet: "http://polaris1.ont.io:20336",
-		GasPrice:                 500,
+		GasPrice:                 2500,
 		GasLimit:                 2000000,
 	},
 	EthCfg: &Eth{
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
-		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
-		GasPrice:       ETH_DEFAULT_GAS_PRICE,
+		//RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddrTestNet: "http://18.140.187.37:10331",
+		GasPrice:       20, //unit is gwei
 	},
 }
 
@@ -41,18 +42,16 @@ type Config struct {
 }
 
 const (
-	LogPath           = "./Log"
-	DefaultWalletPath = "./wallet"
-	DBPath            = "db"
+	LogPath = "./Log"
+	DBPath  = "db"
 )
 
 var (
 	DEFAULT_LOG_LEVEL = log.InfoLog
 	DEFAULT_REST_PORT = uint(20327)
 
-	ONT_TRANSFER_QUEUE_SIZE = 100
-	ETH_TRANSFER_QUEUE_SIZE = 20
-	All_TOKEN_TYPE          []string //need init when server start, //TODO
+	ONT_TRANSFER_QUEUE_SIZE = 5000
+	ETH_TRANSFER_QUEUE_SIZE = 500
 )
 
 type Ont struct {

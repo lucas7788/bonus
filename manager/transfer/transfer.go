@@ -11,6 +11,7 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"math/big"
 	"sync"
+	"fmt"
 )
 
 type TxHandleTask struct {
@@ -132,6 +133,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		return err
 	}
 	close(self.verifyTxQueue)
+	fmt.Println("close self.verifyTxQueue")
 	return nil
 }
 
@@ -165,7 +167,11 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 	for verifyP := range self.verifyTxQueue {
 		var boo bool
 		var err error
-		boo, err = mana.VerifyTx(verifyP.TxHash, config.RetryLimit)
+		var retryLimit = config.RetryLimit
+		if verifyP.needSend {
+			retryLimit = 1
+		}
+		boo, err = mana.VerifyTx(verifyP.TxHash, retryLimit)
 		if err != nil || !boo {
 			if verifyP.needSend {
 				_, err = mana.SendTx(verifyP.TxHex)
@@ -199,7 +205,7 @@ func (self *TxHandleTask) StartVerifyTxTask(mana interfaces.WithdrawManager) {
 			log.Errorf("UpdateTxResult error: %s, txHash: %s", err, verifyP.TxHash)
 			continue
 		}
-		log.Debugf("verify tx success, txhash: %s", verifyP.TxHash)
+		log.Infof("verify tx success, txhash: %s", verifyP.TxHash)
 	}
 	log.Info("exit StartVerifyTxTask gorountine")
 	self.TransferStatus = common.Transfered

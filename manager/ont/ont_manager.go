@@ -556,11 +556,13 @@ func (self *OntManager) VerifyTx(txHash string, retryLimit int) (bool, error) {
 			return false, err
 		}
 		if event == nil && retry < retryLimit {
+			log.Errorf("event is nil, txhash: %s, retry:%d", txHash, retry)
 			retry += 1
 			time.Sleep(time.Duration(retry*config.SleepTime) * time.Second)
 			continue
 		}
 		if event == nil {
+			log.Errorf("event is nil, txhash: %s", txHash)
 			return false, fmt.Errorf("no the transaction")
 		}
 		if event.State == 1 {

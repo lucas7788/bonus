@@ -296,7 +296,13 @@ func (self *OntManager) WithdrawToken(address string, tokenType string) error {
 
 func (self *OntManager) withdrawToken(address, tokenType, amt string) error {
 	log.Infof("address:%s, amt:%s", address, amt)
-	amount := utils.ToIntByPrecise(amt, uint64(self.decimals))
+	var amount *big.Int
+	if tokenType == config.ONG {
+		amount = utils.ToIntByPrecise(amt, uint64(config.ONG_DECIMALS))
+	} else {
+		amount = utils.ToIntByPrecise(amt, uint64(self.decimals))
+	}
+
 	_, txHex, err := self.NewWithdrawTx(address, amount, tokenType)
 	if err != nil {
 		log.Errorf("NewWithdrawTx failed, error: %s", err)

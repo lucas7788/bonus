@@ -52,16 +52,21 @@ func TestEthManager_Withdraw(t *testing.T) {
 	//	}
 	eth := &config.Eth{
 		RpcAddrMainNet: "http://onto-eth.ont.io:10331",
-		RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		RpcAddrTestNet:"https://kovan.infura.io/v3/d87255a6627542eba4eaa9d5278832e0",
+		//RpcAddrTestNet: "https://ropsten.infura.io/v3/3425c463d2f1455c8c260b990c71a888",
+		GasPrice:10,
 	}
-
-	manager, err := NewEthManager(eth, nil, config.MainNet)
+	//rpcAddr := "https://kovan.infura.io/v3/d87255a6627542eba4eaa9d5278832e0"
+	eatp := &common.ExcelParam{
+		ContractAddress:"0x58708604BAE3e6133354cef87A042A14DcE9D1C7",
+		EventType:"test",
+	}
+	manager, err := NewEthManager(eth, eatp, config.TestNet)
 	if err != nil {
 		fmt.Println("NewEthManager err:", err)
 		return
 	}
-	return
-	txhash, txHex, err := manager.NewWithdrawTx("0x1F8aD8DDC9b248f46C34F66a28b14c3B867f02e3", new(big.Int).SetUint64(1), config.ETH)
+	txhash, txHex, err := manager.NewWithdrawTx("0x1F8aD8DDC9b248f46C34F66a28b14c3B867f02e3", new(big.Int).SetUint64(1), config.ERC20)
 	if err != nil {
 		fmt.Println("[NewWithdrawTx] err:", err)
 		return

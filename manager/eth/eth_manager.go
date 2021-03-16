@@ -465,34 +465,13 @@ func (this *EthManager) NewWithdrawTx(destAddr string, amount *big.Int, tokenTyp
 	} else {
 		return "", nil, fmt.Errorf("Withdraw: dest addr is invaild")
 	}
-	//ethBalance, err := this.ethClient.PendingBalanceAt(context.Background(), this.account.Address)
-	//if err != nil {
-	//	return "", nil, fmt.Errorf("Withdraw: cannot get eth pending balance, err: %s", err)
-	//}
-	//if ethBalance.Cmp(MIN_ETH_BANALNCE) < 0 {
-	//	return "", nil, fmt.Errorf("Withdraw: self eth pending balance %s not enough",
-	//		utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
-	//}
 	if (this.excel.TokenType == config.ETH && tokenType == "") || tokenType == config.ETH {
-		//if ethBalance.Cmp(amount) < 0 {
-		//	return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
-		//}
-		//log.Debugf("Withdraw: %s, pending balance is %s", this.excel.TokenType,
-		//	utils.ToStringByPrecise(ethBalance, config.ETH_DECIMALS))
 		return this.newWithdrawEthTx(to, amount, this.gasPrice)
 	} else {
 		erc20, ok := this.tokens[this.excel.ContractAddress]
 		if !ok {
 			return "", nil, fmt.Errorf("Withdraw: token %s not exist", this.excel.ContractAddress)
 		}
-		//balance, err := erc20.Contract.BalanceOf(&bind.CallOpts{Pending: false}, this.account.Address)
-		//if err != nil {
-		//	return "", nil, fmt.Errorf("Withdraw: cannot get self balance, token %s, err: %s", this.excel.ContractAddress, err)
-		//}
-		//if balance.Cmp(amount) < 0 {
-		//	return "", nil, fmt.Errorf("%s", config.InSufficientBalance)
-		//}
-		//log.Debugf("Withdraw: %s, pending balance is %s", this.excel.ContractAddress, utils.ToStringByPrecise(balance, erc20.Decimals))
 		return this.newWithdrawErc20Tx(erc20.ContractAddr, to, amount, this.gasPrice)
 	}
 }

@@ -94,6 +94,7 @@ func NewEthManager(cfg *config.Eth, eatp *common2.ExcelParam, netType string) (*
 	walletPath := filepath.Join(walletDir, "eth_"+eatp.EventType)
 	log.Infof("eth wallet path: %s", walletPath)
 
+
 	keyStore := keystore.NewKeyStore(walletPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	accs := keyStore.Accounts()
 	var account accounts.Account

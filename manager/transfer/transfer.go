@@ -63,7 +63,7 @@ func (self *TxHandleTask) StartTxTask(mana interfaces.WithdrawManager, excel *co
 		return err
 	}
 	newTxHexMap := make(map[string][]byte)
-	limit := 200
+	limit := 500
 	if excel.TokenType == config.ETH || excel.TokenType == config.ERC20 {
 		limit = 5
 	}

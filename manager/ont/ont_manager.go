@@ -505,6 +505,7 @@ func (self *OntManager) ComputeSum() (string, error) {
 	} else if self.excel.TokenType == config.OEP4 {
 		for _, item := range self.excel.BillList {
 			val := utils.ParseAssetAmount(item.Amount, self.decimals)
+			log.Infof("val:%d, item.Amount: %s", val, item.Amount)
 			sum += val
 		}
 		temp := new(big.Int)
